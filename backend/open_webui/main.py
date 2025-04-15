@@ -381,8 +381,6 @@ from open_webui.tasks import (
 
 from open_webui.utils.redis import get_sentinels_from_env
 
-from open_webui.utils.redis import get_sentinels_from_env
-
 
 if SAFE_MODE:
     print("SAFE MODE ENABLED")

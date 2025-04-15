@@ -40,8 +40,6 @@ from open_webui.env import AIOHTTP_CLIENT_TIMEOUT_TOOL_SERVER_DATA
 
 import copy
 
-import copy
-
 log = logging.getLogger(__name__)
 
 
