@@ -188,6 +188,7 @@ jobs:
               $NEW_NAME = "raux-$env:VERSION-$env:COMMIT-setup.exe"
               Move-Item -Path $INSTALLER_PATH -Destination $NEW_NAME -Force
               echo "INSTALLER_NAME=$NEW_NAME" >> $env:GITHUB_ENV
+              echo "installer_name=$NEW_NAME" >> $env:GITHUB_OUTPUT
             } else {
               Write-Host "ERROR: No installer .exe files found in installer directory!"
               exit 1
@@ -248,6 +249,7 @@ jobs:
           $ZIP_NAME = "raux-$env:VERSION-$env:COMMIT-setup.zip"
           Compress-Archive -Path "package/*" -DestinationPath $ZIP_NAME
           echo "ZIP_NAME=$ZIP_NAME" >> $env:GITHUB_ENV
+          echo "zip_name=$ZIP_NAME" >> $env:GITHUB_OUTPUT
           Write-Host "Created zip file: $ZIP_NAME with installer, ux_installer directory, and launcher scripts"
 
       # Upload all installer artifacts
@@ -268,13 +270,6 @@ jobs:
       contents: write
 
     steps:
-      - name: Get version and commit from previous job
-        run: |
-          echo "VERSION=${{ needs.publish-installer.outputs.version }}" >> $GITHUB_ENV
-          echo "COMMIT=${{ needs.publish-installer.outputs.commit }}" >> $GITHUB_ENV
-          echo "Version: ${{ needs.publish-installer.outputs.version }}"
-          echo "Commit: ${{ needs.publish-installer.outputs.commit }}"
-
       - name: Download installer artifacts
         uses: actions/download-artifact@v4
         with:
@@ -284,9 +279,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/${{ env.INSTALLER_NAME }}
-            artifacts/${{ env.INSTALLER_NAME }}.sha256
-            artifacts/${{ env.ZIP_NAME }}
+            artifacts/${{ needs.publish-installer.outputs.INSTALLER_NAME }}
+            artifacts/${{ needs.publish-installer.outputs.INSTALLER_NAME }}.sha256
+            artifacts/${{ needs.publish-installer.outputs.ZIP_NAME }}
           draft: true
           prerelease: true
           name: "v${{ needs.publish-installer.outputs.version }} (${{ needs.publish-installer.outputs.commit }})"
