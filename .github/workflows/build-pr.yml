@@ -322,8 +322,8 @@ jobs:
             artifacts/artifact/*
           draft: true
           prerelease: true
-          name: "v${{ needs.publish-installer.outputs.version }} (${{ needs.publish-installer.outputs.commit }})"
-          tag_name: "v${{ needs.publish-installer.outputs.version }}-${{ needs.publish-installer.outputs.commit }}"
+          name: "v${{ needs.publish-installer.outputs.version }}.${{ needs.publish-installer.outputs.commit }}"
+          tag_name: "v${{ needs.publish-installer.outputs.version }}.${{ needs.publish-installer.outputs.commit }}"
           body: |
             This is a draft release for testing purposes.
             
