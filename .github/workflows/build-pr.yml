@@ -258,3 +258,32 @@ jobs:
             ${{ env.INSTALLER_NAME }}.sha256
             ${{ env.ZIP_NAME }}
           retention-days: 7
+
+  create-release:
+    needs: publish-installer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/${{ env.INSTALLER_NAME }}
+            artifacts/${{ env.INSTALLER_NAME }}.sha256
+            artifacts/${{ env.ZIP_NAME }}
+          draft: true
+          prerelease: true
+          name: "v${{ env.VERSION }} (${{ env.COMMIT }})"
+          tag_name: "v${{ env.VERSION }}-${{ env.COMMIT }}"
+          body: |
+            This is a draft release for testing purposes.
+            
+            Changes in this PR:
+            ${{ github.event.pull_request.body }}
