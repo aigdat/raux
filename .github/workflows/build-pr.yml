@@ -116,6 +116,8 @@ jobs:
           $COMMIT = "${{ github.sha }}".Substring(0, 7)
           echo "VERSION=$VERSION" >> $env:GITHUB_ENV
           echo "COMMIT=$COMMIT" >> $env:GITHUB_ENV
+          echo "version=$VERSION" >> $env:GITHUB_OUTPUT
+          echo "commit=$COMMIT" >> $env:GITHUB_OUTPUT
 
       # Download the wheel file directly from the artifact
       - name: Download wheel artifact
@@ -266,6 +268,11 @@ jobs:
       contents: write
 
     steps:
+      - name: Get version and commit from previous job
+        run: |
+          echo "VERSION=${{ needs.publish-installer.outputs.version }}" >> $GITHUB_ENV
+          echo "COMMIT=${{ needs.publish-installer.outputs.commit }}" >> $GITHUB_ENV
+
       - name: Download installer artifacts
         uses: actions/download-artifact@v4
         with:
