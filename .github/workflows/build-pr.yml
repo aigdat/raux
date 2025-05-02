@@ -86,6 +86,12 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+    # Define job outputs here
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      commit: ${{ steps.get_version.outputs.commit }}
+      installer_name: ${{ steps.rename_installer.outputs.installer_name }}
+      zip_name: ${{ steps.zip_installer.outputs.zip_name }}
 
     steps:
       - name: Checkout repository
@@ -114,8 +120,8 @@ jobs:
         run: |
           $VERSION = (Get-Content package.json | ConvertFrom-Json).version
           $COMMIT = "${{ github.sha }}".Substring(0, 7)
-          Write-Output "::set-output name=version::$VERSION"
-          Write-Output "::set-output name=commit::$COMMIT"
+          echo "version=$VERSION" >> $env:GITHUB_OUTPUT
+          echo "commit=$COMMIT" >> $env:GITHUB_OUTPUT
           Write-Host "Version: $VERSION"
           Write-Host "Commit: $COMMIT"
 
@@ -193,7 +199,7 @@ jobs:
               $NEW_NAME = "raux-$VERSION-$COMMIT-setup.exe"
               Write-Host "New installer name will be: $NEW_NAME"
               Move-Item -Path $INSTALLER_PATH -Destination $NEW_NAME -Force
-              Write-Output "::set-output name=installer_name::$NEW_NAME"
+              echo "installer_name=$NEW_NAME" >> $env:GITHUB_OUTPUT
               Write-Host "Set installer_name to: $NEW_NAME"
               Write-Host "Current directory: $PWD"
               Write-Host "File exists after move: $(Test-Path -Path $NEW_NAME)"
@@ -276,7 +282,7 @@ jobs:
           # Create the zip file with all contents
           $ZIP_NAME = "raux-${{ steps.get_version.outputs.version }}-${{ steps.get_version.outputs.commit }}-setup.zip"
           Compress-Archive -Path "package\*" -DestinationPath $ZIP_NAME
-          Write-Output "::set-output name=zip_name::$ZIP_NAME"
+          echo "zip_name=$ZIP_NAME" >> $env:GITHUB_OUTPUT
           Write-Host "Created zip file: $ZIP_NAME with installer, ux_installer directory, and launcher scripts"
 
       # Upload all installer artifacts
@@ -313,9 +319,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/artifact/${{ needs.publish-installer.outputs.installer_name }}
-            artifacts/artifact/${{ needs.publish-installer.outputs.installer_name }}.sha256
-            artifacts/artifact/${{ needs.publish-installer.outputs.zip_name }}
+            artifacts/artifact/*
           draft: true
           prerelease: true
           name: "v${{ needs.publish-installer.outputs.version }} (${{ needs.publish-installer.outputs.commit }})"
