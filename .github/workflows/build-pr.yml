@@ -272,6 +272,8 @@ jobs:
         run: |
           echo "VERSION=${{ needs.publish-installer.outputs.version }}" >> $GITHUB_ENV
           echo "COMMIT=${{ needs.publish-installer.outputs.commit }}" >> $GITHUB_ENV
+          echo "Version: ${{ needs.publish-installer.outputs.version }}"
+          echo "Commit: ${{ needs.publish-installer.outputs.commit }}"
 
       - name: Download installer artifacts
         uses: actions/download-artifact@v4
@@ -287,8 +289,8 @@ jobs:
             artifacts/${{ env.ZIP_NAME }}
           draft: true
           prerelease: true
-          name: "v${{ env.VERSION }} (${{ env.COMMIT }})"
-          tag_name: "v${{ env.VERSION }}-${{ env.COMMIT }}"
+          name: "v${{ needs.publish-installer.outputs.version }} (${{ needs.publish-installer.outputs.commit }})"
+          tag_name: "v${{ needs.publish-installer.outputs.version }}-${{ needs.publish-installer.outputs.commit }}"
           body: |
             This is a draft release for testing purposes.
             
