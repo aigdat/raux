@@ -116,6 +116,8 @@ jobs:
           $COMMIT = "${{ github.sha }}".Substring(0, 7)
           Write-Output "version=$VERSION"
           Write-Output "commit=$COMMIT"
+          Write-Host "Version: $VERSION"
+          Write-Host "Commit: $COMMIT"
 
       # Download the wheel file directly from the artifact
       - name: Download wheel artifact
@@ -127,8 +129,8 @@ jobs:
       - name: List downloaded wheel files
         run: |
           Write-Host "Listing downloaded wheel files:"
-          Get-ChildItem -Path dist -Filter "*.whl"
-          $WHEEL_FILE = Get-ChildItem -Path dist -Filter "*.whl" | Select-Object -First 1
+          Get-ChildItem -Path "dist" -Filter "*.whl"
+          $WHEEL_FILE = Get-ChildItem -Path "dist" -Filter "*.whl" | Select-Object -First 1
           if ($WHEEL_FILE) {
             Write-Output "wheel_filename=$($WHEEL_FILE.Name)"
             Write-Host "Using wheel file: $($WHEEL_FILE.Name)"
@@ -143,20 +145,20 @@ jobs:
           Invoke-WebRequest -UserAgent "Wget" -Uri "https://sourceforge.net/projects/nsis/files/NSIS%203/3.10/nsis-3.10-setup.exe" -OutFile "nsis.exe"
           
           # Install NSIS
-          Start-Process nsis.exe -ArgumentList '/S' -Wait
+          Start-Process -FilePath ".\nsis.exe" -ArgumentList '/S' -Wait
           
           # Add NSIS to PATH
           $env:PATH = "C:\Program Files (x86)\NSIS;$env:PATH"
 
       - name: Check for NSIS script
         run: |
-          $SCRIPT_PATH = "installer\Installer-UX.nsi"
+          $SCRIPT_PATH = Join-Path -Path $PWD -ChildPath "installer\Installer-UX.nsi"
           if (Test-Path -Path $SCRIPT_PATH) {
             Write-Host "NSIS script found at $SCRIPT_PATH"
             Get-Content -Path $SCRIPT_PATH -TotalCount 10  # Show first 10 lines
           } else {
             Write-Host "ERROR: NSIS script not found at $SCRIPT_PATH"
-            Write-Host "Current directory: $(Get-Location)"
+            Write-Host "Current directory: $PWD"
             Write-Host "Listing all files in the repository:"
             Get-ChildItem -Path . -Recurse | Select-Object -ExpandProperty FullName
           }
@@ -165,7 +167,7 @@ jobs:
         run: |
           Write-Host "Building installer with NSIS..."
           # Use the full path to the script
-          $SCRIPT_PATH = "$(Get-Location)\installer\Installer-UX.nsi"
+          $SCRIPT_PATH = Join-Path -Path $PWD -ChildPath "installer\Installer-UX.nsi"
           Write-Host "Using NSIS script at: $SCRIPT_PATH"
           
           if (Test-Path -Path $SCRIPT_PATH) {
@@ -179,16 +181,22 @@ jobs:
         if: success()
         id: rename_installer
         run: |
-          if (Test-Path -Path "installer") {
-            $INSTALLER_FILES = Get-ChildItem -Path "installer" -Filter "*.exe" | Where-Object { $_.Name -ne "nsis.exe" }
+          $INSTALLER_DIR = Join-Path -Path $PWD -ChildPath "installer"
+          if (Test-Path -Path $INSTALLER_DIR) {
+            $INSTALLER_FILES = Get-ChildItem -Path $INSTALLER_DIR -Filter "*.exe" | Where-Object { $_.Name -ne "nsis.exe" }
             if ($INSTALLER_FILES) {
               $INSTALLER_PATH = $INSTALLER_FILES[0].FullName
               Write-Host "Found installer at: $INSTALLER_PATH"
-              $NEW_NAME = "raux-${{ steps.get_version.outputs.version }}-${{ steps.get_version.outputs.commit }}-setup.exe"
+              $VERSION = "${{ steps.get_version.outputs.version }}"
+              $COMMIT = "${{ steps.get_version.outputs.commit }}"
+              Write-Host "Using version: $VERSION"
+              Write-Host "Using commit: $COMMIT"
+              $NEW_NAME = "raux-$VERSION-$COMMIT-setup.exe"
+              Write-Host "New installer name will be: $NEW_NAME"
               Move-Item -Path $INSTALLER_PATH -Destination $NEW_NAME -Force
               Write-Output "installer_name=$NEW_NAME"
               Write-Host "Set installer_name to: $NEW_NAME"
-              Write-Host "Current directory: $(Get-Location)"
+              Write-Host "Current directory: $PWD"
               Write-Host "File exists after move: $(Test-Path -Path $NEW_NAME)"
             } else {
               Write-Host "ERROR: No installer .exe files found in installer directory!"
@@ -205,7 +213,7 @@ jobs:
           # Get the installer name from the previous step
           $INSTALLER_NAME = "${{ steps.rename_installer.outputs.installer_name }}"
           Write-Host "Creating checksum for installer: $INSTALLER_NAME"
-          Write-Host "Current directory: $(Get-Location)"
+          Write-Host "Current directory: $PWD"
           
           # Verify the file exists
           if (-not (Test-Path -Path $INSTALLER_NAME)) {
