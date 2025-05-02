@@ -15,36 +15,53 @@ PYTHON_VERSION = "3.11.8"  # Specific version for consistency
 PYTHON_DIR = "python"  # Directory name for standalone Python
 
 
-def install_raux(install_dir, debug=False):
+def install_raux(install_dir, debug=False, log_file=None, version=None):
     """
     Install RAUX (Windows-only).
 
     Args:
         install_dir (str): Directory where RAUX will be installed
         debug (bool): Enable debug logging
+        log_file (str): Custom log file path
+        version (str): Specific version to install (e.g., "v0.6.5+raux.0.1.0.ab30cdb")
 
     Returns:
         int: Exit code (0 for success, non-zero for failure)
     """
     # Setup logging to both console and file
-    log_file = os.path.join(install_dir, "raux_install.log")
+    if log_file is None or not log_file.strip():
+        log_file = os.path.join(install_dir, "raux_install.log")
+    else:
+        # Ensure the log file doesn't have any unexpected characters
+        log_file = log_file.strip()
+        # Make sure the parent directory exists
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
+    # Check if log file already exists - if it does, append to it
+    append_mode = os.path.exists(log_file)
+    log_mode = "a" if append_mode else "w"
+    
     log_level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(
         level=log_level,
         format="[%(asctime)s] [RAUX-Installer] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
-            logging.FileHandler(log_file, mode="a"),
+            logging.FileHandler(log_file, mode=log_mode),
             logging.StreamHandler(sys.stdout),
         ],
     )
 
     # Start installation
-    logging.info("===== RAUX INSTALLER =====")
+    if append_mode:
+        logging.info("\n\n===== RAUX INSTALLER CONTINUING =====")
+    else:
+        logging.info("===== RAUX INSTALLER =====")
     logging.info(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logging.info(f"Current directory: {os.getcwd()}")
-    logging.info(f"Log file: {log_file}")
+    logging.info(f"Using log file: {log_file} (in {log_mode} mode)")
+    if version:
+        logging.info(f"Requested specific version: {version}")
 
     # Verify parameters
     logging.info("Verifying parameters...")
@@ -102,9 +119,15 @@ def install_raux(install_dir, debug=False):
                 f"Cannot create test file in temporary directory: {str(e)}"
             )
 
-        # Get the latest release URL
-        logging.info("Fetching the latest release URL...")
-        download_url = get_latest_release_url()
+        # Get the URL based on version parameter or latest release
+        logging.info("Determining download URL...")
+        if version:
+            # Use specific version instead of fetching latest
+            download_url = get_specific_version_url(version)
+        else:
+            # Fallback to latest release if no version specified
+            download_url = get_latest_release_url()
+            
         logging.info(f"Using download URL: {download_url}")
 
         # Download the zip file
@@ -213,7 +236,7 @@ def install_raux(install_dir, debug=False):
             format="[%(asctime)s] [RAUX-Installer] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
             handlers=[
-                logging.FileHandler(log_file, mode="a"),
+                logging.FileHandler(log_file, mode=log_mode),
                 logging.StreamHandler(sys.stdout),
             ],
         )
@@ -427,6 +450,23 @@ def get_latest_release_url():
         raise ValueError(f"Error fetching release info: {str(e)}")
 
 
+def get_specific_version_url(version):
+    """
+    Construct the download URL for a specific version.
+    
+    Args:
+        version (str): The version string (e.g., "v0.6.5+raux.0.1.0.ab30cdb")
+        
+    Returns:
+        str: The download URL
+    """
+    # Remove leading 'v' if present for filename
+    filename_version = version[1:] if version.startswith('v') else version
+    
+    # Construct full URL
+    return f"https://github.com/aigdat/raux/releases/download/{version}/raux-{filename_version}-setup.zip"
+
+
 if __name__ == "__main__":
     # If run directly, parse command line arguments
     import argparse
@@ -434,8 +474,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RAUX Installer (Windows-only)")
     parser.add_argument("--install-dir", required=True, help="Installation directory")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--log-file", help="Custom log file path")
+    parser.add_argument("--version", help="Specific version to install")
 
     args = parser.parse_args()
 
-    exit_code = install_raux(args.install_dir, args.debug)
+    exit_code = install_raux(args.install_dir, args.debug, args.log_file, args.version)
     sys.exit(exit_code)

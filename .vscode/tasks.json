@@ -24,7 +24,8 @@
 				"reveal": "always",
 				"panel": "new"
 			},
-			"problemMatcher": []
+			"problemMatcher": [],
+			"dependsOn": "Build RAUX Installer"
 		},
 		{
 			"label": "Clean RAUX Environment: AppData",
