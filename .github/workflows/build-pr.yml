@@ -114,8 +114,8 @@ jobs:
         run: |
           $VERSION = (Get-Content package.json | ConvertFrom-Json).version
           $COMMIT = "${{ github.sha }}".Substring(0, 7)
-          Write-Output "version=$VERSION"
-          Write-Output "commit=$COMMIT"
+          Write-Output "::set-output name=version::$VERSION"
+          Write-Output "::set-output name=commit::$COMMIT"
           Write-Host "Version: $VERSION"
           Write-Host "Commit: $COMMIT"
 
@@ -181,9 +181,8 @@ jobs:
         if: success()
         id: rename_installer
         run: |
-          $INSTALLER_DIR = Join-Path -Path $PWD -ChildPath "installer"
-          if (Test-Path -Path $INSTALLER_DIR) {
-            $INSTALLER_FILES = Get-ChildItem -Path $INSTALLER_DIR -Filter "*.exe" | Where-Object { $_.Name -ne "nsis.exe" }
+          if (Test-Path -Path "installer") {
+            $INSTALLER_FILES = Get-ChildItem -Path "installer" -Filter "*.exe" | Where-Object { $_.Name -ne "nsis.exe" }
             if ($INSTALLER_FILES) {
               $INSTALLER_PATH = $INSTALLER_FILES[0].FullName
               Write-Host "Found installer at: $INSTALLER_PATH"
@@ -194,7 +193,7 @@ jobs:
               $NEW_NAME = "raux-$VERSION-$COMMIT-setup.exe"
               Write-Host "New installer name will be: $NEW_NAME"
               Move-Item -Path $INSTALLER_PATH -Destination $NEW_NAME -Force
-              Write-Output "installer_name=$NEW_NAME"
+              Write-Output "::set-output name=installer_name::$NEW_NAME"
               Write-Host "Set installer_name to: $NEW_NAME"
               Write-Host "Current directory: $PWD"
               Write-Host "File exists after move: $(Test-Path -Path $NEW_NAME)"
@@ -277,7 +276,7 @@ jobs:
           # Create the zip file with all contents
           $ZIP_NAME = "raux-${{ steps.get_version.outputs.version }}-${{ steps.get_version.outputs.commit }}-setup.zip"
           Compress-Archive -Path "package\*" -DestinationPath $ZIP_NAME
-          Write-Output "zip_name=$ZIP_NAME"
+          Write-Output "::set-output name=zip_name::$ZIP_NAME"
           Write-Host "Created zip file: $ZIP_NAME with installer, ux_installer directory, and launcher scripts"
 
       # Upload all installer artifacts
@@ -303,13 +302,20 @@ jobs:
         with:
           path: artifacts
 
+      - name: List downloaded artifacts
+        run: |
+          echo "Listing artifacts directory:"
+          ls -la artifacts/
+          echo "Listing artifact subdirectories:"
+          ls -la artifacts/*/
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/${{ needs.publish-installer.outputs.installer_name }}
-            artifacts/${{ needs.publish-installer.outputs.installer_name }}.sha256
-            artifacts/${{ needs.publish-installer.outputs.zip_name }}
+            artifacts/artifact/${{ needs.publish-installer.outputs.installer_name }}
+            artifacts/artifact/${{ needs.publish-installer.outputs.installer_name }}.sha256
+            artifacts/artifact/${{ needs.publish-installer.outputs.zip_name }}
           draft: true
           prerelease: true
           name: "v${{ needs.publish-installer.outputs.version }} (${{ needs.publish-installer.outputs.commit }})"
