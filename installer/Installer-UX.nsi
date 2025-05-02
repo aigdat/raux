@@ -387,7 +387,8 @@ FunctionEnd
 ; Add function to download release assets from GitHub
 Function DownloadRelease
   ; Remove the 'v' prefix for the filename if present
-  ${If} ${RAUX_RELEASE_VERSION} StartsWith "v"
+  StrCpy $1 ${RAUX_RELEASE_VERSION} 1
+  ${If} $1 == "v"
     StrCpy $1 ${RAUX_RELEASE_VERSION} "" 1  ; Get substring starting from position 1 (skipping 'v')
     StrCpy $RauxReleaseURL "${RAUX_RELEASE_BASE_URL}/raux-$1-setup.zip"
   ${Else}
