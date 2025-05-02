@@ -187,6 +187,9 @@ jobs:
               $NEW_NAME = "raux-${{ steps.get_version.outputs.version }}-${{ steps.get_version.outputs.commit }}-setup.exe"
               Move-Item -Path $INSTALLER_PATH -Destination $NEW_NAME -Force
               Write-Output "installer_name=$NEW_NAME"
+              Write-Host "Set installer_name to: $NEW_NAME"
+              Write-Host "Current directory: $(Get-Location)"
+              Write-Host "File exists after move: $(Test-Path -Path $NEW_NAME)"
             } else {
               Write-Host "ERROR: No installer .exe files found in installer directory!"
               exit 1
@@ -199,10 +202,29 @@ jobs:
       - name: Create checksums
         if: success()
         run: |
+          # Get the installer name from the previous step
+          $INSTALLER_NAME = "${{ steps.rename_installer.outputs.installer_name }}"
+          Write-Host "Creating checksum for installer: $INSTALLER_NAME"
+          Write-Host "Current directory: $(Get-Location)"
+          
+          # Verify the file exists
+          if (-not (Test-Path -Path $INSTALLER_NAME)) {
+            Write-Host "ERROR: Installer file not found at: $INSTALLER_NAME"
+            Write-Host "Listing current directory contents:"
+            Get-ChildItem
+            exit 1
+          }
+          
           # Create SHA256 checksum file
-          $CHECKSUM = (Get-FileHash -Path "${{ steps.rename_installer.outputs.installer_name }}" -Algorithm SHA256).Hash.ToLower()
-          $CHECKSUM | Out-File -FilePath "${{ steps.rename_installer.outputs.installer_name }}.sha256" -Encoding ascii
-          Write-Host "Created checksum file with value: $CHECKSUM"
+          try {
+            $CHECKSUM = (Get-FileHash -Path $INSTALLER_NAME -Algorithm SHA256).Hash.ToLower()
+            $CHECKSUM | Out-File -FilePath "$INSTALLER_NAME.sha256" -Encoding ascii
+            Write-Host "Created checksum file with value: $CHECKSUM"
+            Write-Host "Checksum file exists: $(Test-Path -Path "$INSTALLER_NAME.sha256")"
+          } catch {
+            Write-Host "ERROR: Failed to create checksum: $_"
+            exit 1
+          }
 
       - name: Zip installer executable
         if: success()
