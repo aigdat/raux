@@ -34,12 +34,12 @@ Modify the RAUX installer to eliminate the conda dependency and make it use its 
   - [x] Using standalone Python path when calling `install.py`
 
 - [x] Updated `Installer.nsi`:
-  - [x] Added Python version and directory constants
-  - [x] Added Python download and setup section
-  - [x] Removed conda installation steps
+  - [x] Added proper Python version and directory constants
+  - [x] Added Python embedded package download and setup
+  - [x] Removed all conda installation steps
   - [x] Updated error handling to reflect Python-only installation
-  - [x] Verified Python installation path matches `%LOCALAPPDATA%\RAUX\python\python.exe`
-  - [x] Added pip installation and package setup
+  - [x] Ensured consistent Python path usage: `%LOCALAPPDATA%\RAUX\python\python.exe`
+  - [x] Added pip and required packages installation
 
 ## Testing Results (May 1, 2025)
 
@@ -47,13 +47,14 @@ Modify the RAUX installer to eliminate the conda dependency and make it use its 
   - Modified `install.py` works as expected when run directly with standalone Python
   - The Python executable path in launcher scripts points to `%LOCALAPPDATA%\RAUX\python\python.exe`
   - Need to verify that `raux_installer.py` changes correctly create Python in this location
+  - Need to test the updated `Installer.nsi` changes
 
 ## Remaining Tasks
 
 - [ ] Ensure path consistency across all components:
-  - [ ] Verify all files reference the same Python path: `%LOCALAPPDATA%\RAUX\python\python.exe`
-  - [ ] Update any remaining scripts that might reference the conda environment
-  - [ ] Test path resolution in all scripts
+  - [ ] Test all files to verify they reference the same Python path: `%LOCALAPPDATA%\RAUX\python\python.exe`
+  - [ ] Run a complete installation test to verify Python setup and path usage
+  - [ ] Verify no remaining conda references exist in any files
 
 ## Test Plan
 
@@ -74,9 +75,10 @@ Modify the RAUX installer to eliminate the conda dependency and make it use its 
 
 ## Implementation Approach (Revised)
 
-1. **Comprehensive File Updates**: 
-   - Update all references to conda in all files
-   - Ensure consistent Python path usage: `%LOCALAPPDATA%\RAUX\python\python.exe`
+1. **Comprehensive Testing**: 
+   - Run full installation tests to verify all components work together
+   - Check all Python path references are consistent
+   - Verify no conda dependencies remain
 
 2. **Build Process Integration**:
    - Ensure GitHub workflows build and package the updated files correctly

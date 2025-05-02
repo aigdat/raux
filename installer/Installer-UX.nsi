@@ -22,6 +22,10 @@ RequestExecutionLevel user
 !define /ifndef EMPTY_FILE_NAME "empty_file.txt"
 !define /ifndef ICON_FILE "${__FILE__}\..\..\static\${PROJECT_NAME_CONCAT}.ico"
 !define /ifndef ICON_DEST "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}.ico"
+!define /ifndef PYTHON_VERSION "3.11.8"
+!define /ifndef PYTHON_DIR "python"
+!define /ifndef PYTHON_EMBED_URL "https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip"
+!define /ifndef GET_PIP_URL "https://bootstrap.pypa.io/get-pip.py"
 
 ; This is a compile-time fix to make sure that our selfhost CI runner can successfully install,
 ; since LOCALAPPDATA points to C:\Windows for "system users"
@@ -34,6 +38,7 @@ InstallDir "$LOCALAPPDATA\${PROJECT_NAME}"
 !delfile "${TMPFILE}"
 
 ; Define variables
+Var PythonPath
 Var LogFilePath
 
 ; Finish Page settings
@@ -71,8 +76,7 @@ LangString MUI_TEXT_LICENSE_SUBTITLE ${LANG_ENGLISH} "Please review the license 
 
 Function .onInit
   ; Initialize variables
-  StrCpy $raux_CONDA_ENV "${PROJECT_NAME_CONCAT}_env"
-  StrCpy $PythonVersion "3.11"
+  StrCpy $PythonPath "$LOCALAPPDATA\${PROJECT_NAME}\${PYTHON_DIR}\python.exe"
   ; Fix the log file path to avoid variable substitution issues
   StrCpy $LogFilePath "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_install.log"
   
@@ -115,6 +119,7 @@ Section "Install Main Components" SEC01
   continue_install:
     ; Create fresh directory
     CreateDirectory "$LOCALAPPDATA\${PROJECT_NAME}"
+    CreateDirectory "$LOCALAPPDATA\${PROJECT_NAME}\${PYTHON_DIR}"
 
     ; Set the output path for future operations
     SetOutPath "$LOCALAPPDATA\${PROJECT_NAME}"
@@ -123,7 +128,90 @@ Section "Install Main Components" SEC01
     DetailPrint "Configuration:"
     DetailPrint "  Install Dir: $LOCALAPPDATA\${PROJECT_NAME}"
     DetailPrint "  Python Version: ${PYTHON_VERSION}"
+    DetailPrint "  Python Path: $PythonPath"
     DetailPrint "-------------------------------------------"
+
+    ; Setup Python first
+    DetailPrint "[Python-Setup] Setting up Python ${PYTHON_VERSION}..."
+    DetailPrint "[Python-Setup] Downloading embedded Python..."
+    
+    ; Download embedded Python
+    ExecWait 'curl -s -o "$LOCALAPPDATA\${PROJECT_NAME}\${PYTHON_DIR}\python.zip" "${PYTHON_EMBED_URL}"' $0
+    ${If} $0 != 0
+      DetailPrint "[Python-Setup] ERROR: Failed to download Python"
+      ${IfNot} ${Silent}
+        MessageBox MB_OK "Failed to download Python. Installation will be aborted."
+      ${EndIf}
+      Quit
+    ${EndIf}
+    
+    ; Extract Python zip
+    DetailPrint "[Python-Setup] Extracting Python..."
+    nsExec::ExecToStack 'powershell -Command "Expand-Archive -Path \"$LOCALAPPDATA\${PROJECT_NAME}\${PYTHON_DIR}\python.zip\" -DestinationPath \"$LOCALAPPDATA\${PROJECT_NAME}\${PYTHON_DIR}\" -Force"'
+    Pop $0
+    Pop $1
+    ${If} $0 != 0
+      DetailPrint "[Python-Setup] ERROR: Failed to extract Python"
+      DetailPrint "[Python-Setup] Error details: $1"
+      ${IfNot} ${Silent}
+        MessageBox MB_OK "Failed to extract Python. Installation will be aborted."
+      ${EndIf}
+      Quit
+    ${EndIf}
+    Delete "$LOCALAPPDATA\${PROJECT_NAME}\${PYTHON_DIR}\python.zip"
+    
+    ; Download get-pip.py
+    DetailPrint "[Python-Setup] Setting up pip..."
+    ExecWait 'curl -sSL "${GET_PIP_URL}" -o "$LOCALAPPDATA\${PROJECT_NAME}\${PYTHON_DIR}\get-pip.py"' $0
+    ${If} $0 != 0
+      DetailPrint "[Python-Setup] ERROR: Failed to download get-pip.py"
+      ${IfNot} ${Silent}
+        MessageBox MB_OK "Failed to download get-pip.py. Installation will be aborted."
+      ${EndIf}
+      Quit
+    ${EndIf}
+    
+    ; Install pip
+    ExecWait '"$PythonPath" "$LOCALAPPDATA\${PROJECT_NAME}\${PYTHON_DIR}\get-pip.py" --no-warn-script-location' $0
+    ${If} $0 != 0
+      DetailPrint "[Python-Setup] ERROR: Failed to install pip"
+      ${IfNot} ${Silent}
+        MessageBox MB_OK "Failed to install pip. Installation will be aborted."
+      ${EndIf}
+      Quit
+    ${EndIf}
+    Delete "$LOCALAPPDATA\${PROJECT_NAME}\${PYTHON_DIR}\get-pip.py"
+    
+    ; Modify python*._pth file to include site-packages
+    DetailPrint "[Python-Setup] Configuring Python paths..."
+    FileOpen $2 "$LOCALAPPDATA\${PROJECT_NAME}\${PYTHON_DIR}\python311._pth" a
+    FileSeek $2 0 END
+    FileWrite $2 "$\r$\nLib$\r$\n"
+    FileWrite $2 "$\r$\nLib\site-packages$\r$\n"
+    FileClose $2
+
+    ; Install required packages
+    DetailPrint "[Python-Setup] Installing required packages..."
+    nsExec::ExecToLog '"$PythonPath" -m pip install --upgrade pip setuptools wheel'
+    Pop $R0
+    ${If} $R0 != 0
+      DetailPrint "[Python-Setup] ERROR: Failed to install basic Python packages"
+      ${IfNot} ${Silent}
+        MessageBox MB_OK "ERROR: Failed to install required Python packages. Installation will be aborted."
+      ${EndIf}
+      Quit
+    ${EndIf}
+
+    DetailPrint "[Python-Setup] Installing requests package..."
+    nsExec::ExecToLog '"$PythonPath" -m pip install requests'
+    Pop $R0
+    ${If} $R0 != 0
+      DetailPrint "[Python-Setup] ERROR: Failed to install requests package"
+      ${IfNot} ${Silent}
+        MessageBox MB_OK "ERROR: Failed to install requests package. Installation will be aborted."
+      ${EndIf}
+      Quit
+    ${EndIf}
 
     ; Pack into the installer
     ; Exclude hidden files (like .git, .gitignore) and the installation folder itself
@@ -132,118 +220,31 @@ Section "Install Main Components" SEC01
     File "LICENSE"
     File ${ICON_FILE}
 
-    ; Check if conda is available
-    ExecWait 'where conda' $2
-    DetailPrint "- Checked if conda is available"
-
-    ; If conda is not found, show a message and exit
-    ; Otherwise, continue with the installation
-    StrCmp $2 "0" create_env conda_not_available
-
-    conda_not_available:
-      DetailPrint "- Conda not installed."
-      ${IfNot} ${Silent}
-        MessageBox MB_YESNO "Conda is not installed. Would you like to install Miniconda?" IDYES install_miniconda IDNO exit_installer
-      ${Else}
-        GoTo install_miniconda
-      ${EndIf}
-
-    exit_installer:
-      DetailPrint "- Something went wrong. Exiting installer"
-      Quit
-
-    install_miniconda:
-      DetailPrint "-------------"
-      DetailPrint "- Miniconda -"
-      DetailPrint "-------------"
-      DetailPrint "- Downloading Miniconda installer..."
-      ExecWait 'curl -s -o "$TEMP\Miniconda3-latest-Windows-x86_64.exe" "https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe"'
-
-      ; Install Miniconda silently
-      ExecWait '"$TEMP\Miniconda3-latest-Windows-x86_64.exe" /InstallationType=JustMe /AddToPath=1 /RegisterPython=0 /S /D=$PROFILE\miniconda3' $2
-      ; Check if Miniconda installation was successful
-      ${If} $2 == 0
-        DetailPrint "- Miniconda installation successful"
-        ${IfNot} ${Silent}
-          MessageBox MB_OK "Miniconda has been successfully installed."
-        ${EndIf}
-
-        StrCpy $R1 "$PROFILE\miniconda3\Scripts\conda.exe"
-        GoTo create_env
-
-      ${Else}
-        DetailPrint "- Miniconda installation failed"
-        ${IfNot} ${Silent}
-          MessageBox MB_OK "Error: Miniconda installation failed. Installation will be aborted."
-        ${EndIf}
-        GoTo exit_installer
-      ${EndIf}
-
-    create_env:
-      DetailPrint "---------------------"
-      DetailPrint "- Conda Environment -"
-      DetailPrint "---------------------"
-
-      DetailPrint "- Initializing conda..."
-      ; Use the appropriate conda executable
-      ${If} $R1 == ""
-        StrCpy $R1 "conda"
-      ${EndIf}
-      ; Initialize conda (needed for systems where conda was previously installed but not initialized)
-      nsExec::ExecToLog '"$R1" init'
-
-      DetailPrint "- Creating a Python $PythonVersion environment named '$raux_CONDA_ENV' in the installation directory: $LOCALAPPDATA\${PROJECT_NAME}..."
-      ExecWait '"$R1" create -n "$raux_CONDA_ENV" python=$PythonVersion -y' $R0
-
-      ; Check if the environment creation was successful (exit code should be 0)
-      StrCmp $R0 0 set_conda_env env_creation_failed
-
-    set_conda_env:
-      DetailPrint "- Setting conda environment $raux_CONDA_ENV..."
-      DetailPrint "- Changing to installation directory..."
-      SetOutPath "$LOCALAPPDATA\${PROJECT_NAME}"
-      
-      DetailPrint "- Verifying conda environment..."
-      ; Instead of trying to activate the environment (which doesn't work well in scripts),
-      ; we'll just verify that the environment exists and is ready to use
-      ExecWait '"$R1" list -n "$raux_CONDA_ENV"' $R0
-
-      StrCmp $R0 0 install_app env_creation_failed
-
-    env_creation_failed:
-      DetailPrint "- ERROR: Environment creation failed"
-      ; Display an error message and exit
-      ${IfNot} ${Silent}
-        MessageBox MB_OK "ERROR: Failed to create the Python environment. Installation will be aborted."
-      ${EndIf}
-      Quit
-
     install_app:
       DetailPrint "--------------------------"
       DetailPrint "- ${PROJECT_NAME} Installation -"
       DetailPrint "--------------------------"
 
-    DetailPrint "- Creating ${PROJECT_NAME} installation directory..."
-    CreateDirectory "$LOCALAPPDATA\${PROJECT_NAME}"
-    
-    DetailPrint "- Creating temporary directory for ${PROJECT_NAME} installation..."
-    CreateDirectory "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp"
-    SetOutPath "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp"
-    
-    DetailPrint "- Preparing for ${PROJECT_NAME} installation..."
-    
-    ; Copy the Python installer script to the temp directory
-    File "${__FILE__}\..\${PROJECT_NAME_CONCAT}_installer.py"
+      DetailPrint "- Creating ${PROJECT_NAME} installation directory..."
+      CreateDirectory "$LOCALAPPDATA\${PROJECT_NAME}"
+      
+      DetailPrint "- Creating temporary directory for ${PROJECT_NAME} installation..."
+      CreateDirectory "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp"
+      SetOutPath "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp"
+      
+      DetailPrint "- Preparing for ${PROJECT_NAME} installation..."
+      
+      ; Copy the Python installer script to the temp directory
+      File "${__FILE__}\..\${PROJECT_NAME_CONCAT}_installer.py"
 
       DetailPrint "- Using Python script: $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py"
       DetailPrint "- Installation directory: $LOCALAPPDATA\${PROJECT_NAME}"
-      DetailPrint "- Using system Python for the entire installation process"
+      DetailPrint "- Using standalone Python for the entire installation process"
       
-      ; Execute the Python script with the required parameters using system Python
-      ; Note: We're not passing the python-exe parameter, so it will use the system Python
-      ExecWait 'python "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py" --install-dir "$LOCALAPPDATA\${PROJECT_NAME}" --debug' $R0
+      ; Execute the Python script with the required parameters using standalone Python
+      ExecWait '"$PythonPath" "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py" --install-dir "$LOCALAPPDATA\${PROJECT_NAME}" --debug' $R0
 
-    DetailPrint "${PRODUCT_NAME} installation exit code: $R0"
+      DetailPrint "${PRODUCT_NAME} installation exit code: $R0"
       
       ; Check if installation was successful
       ${If} $R0 == 0
