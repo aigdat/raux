@@ -285,47 +285,68 @@ jobs:
           echo "zip_name=$ZIP_NAME" >> $env:GITHUB_OUTPUT
           Write-Host "Created zip file: $ZIP_NAME with installer, ux_installer directory, and launcher scripts"
 
+      - name: Create README for artifacts
+        run: |
+          echo "Creating README.txt file for artifacts"
+          echo "RAUX Installer Package" > README.txt
+          echo "=====================" >> README.txt
+          echo "" >> README.txt
+          echo "This package contains the following files:" >> README.txt
+          echo "- ${{ steps.rename_installer.outputs.installer_name }}: The installer executable" >> README.txt
+          echo "- ${{ steps.rename_installer.outputs.installer_name }}.sha256: Checksum file" >> README.txt
+          echo "- ${{ steps.zip_installer.outputs.zip_name }}: Packaged installer with all components" >> README.txt
+          echo "" >> README.txt
+          echo "To test the installer locally:" >> README.txt
+          echo "1. Use the .zip file with the '/LOCAL_RELEASE' parameter:" >> README.txt
+          echo "   Installer-UX.exe /LOCAL_RELEASE=path/to/${{ steps.zip_installer.outputs.zip_name }}" >> README.txt
+          echo "" >> README.txt
+          echo "2. Or use the VS Code task \"Run RAUX Installer with Local Release\"" >> README.txt
+          Write-Host "Created README.txt file for artifacts"
+
       # Upload all installer artifacts
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4
         with:
+          name: raux-installer-package
           if-no-files-found: error
           path: |
             ${{ steps.rename_installer.outputs.installer_name }}
             ${{ steps.rename_installer.outputs.installer_name }}.sha256
             ${{ steps.zip_installer.outputs.zip_name }}
+            README.txt
           retention-days: 7
 
-  create-release:
-    needs: publish-installer
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+  # Comment out the create-release job since we don't want to create releases during PR builds
+  # create-release:
+  #   needs: publish-installer
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: write
 
-    steps:
-      - name: Download installer artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+  #   steps:
+  #     - name: Download installer artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         path: artifacts
 
-      - name: List downloaded artifacts
-        run: |
-          echo "Listing artifacts directory:"
-          ls -la artifacts/
-          echo "Listing artifact subdirectories:"
-          ls -la artifacts/*/
+  #     - name: List downloaded artifacts
+  #       run: |
+  #         echo "Listing artifacts directory:"
+  #         ls -la artifacts/
+  #         echo "Listing artifact subdirectories:"
+  #         ls -la artifacts/*/
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            artifacts/artifact/*
-          draft: true
-          prerelease: true
-          name: "v${{ needs.publish-installer.outputs.version }}.${{ needs.publish-installer.outputs.commit }}"
-          tag_name: "v${{ needs.publish-installer.outputs.version }}.${{ needs.publish-installer.outputs.commit }}"
-          body: |
-            This is a draft release for testing purposes.
-            
-            Changes in this PR:
-            ${{ github.event.pull_request.body }}
+  #     - name: Create GitHub Release
+  #       uses: softprops/action-gh-release@v1
+  #       with:
+  #         files: |
+  #           artifacts/artifact/*
+  #         draft: true
+  #         prerelease: true
+  #         name: "v${{ needs.publish-installer.outputs.version }}.${{ needs.publish-installer.outputs.commit }}"
+  #         tag_name: "v${{ needs.publish-installer.outputs.version }}.${{ needs.publish-installer.outputs.commit }}"
+  #         body: |
+  #           This is a draft release for testing purposes.
+  #           
+  #           Changes in this PR:
+  #           ${{ github.event.pull_request.body }}

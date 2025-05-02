@@ -78,6 +78,17 @@ If you are running Open WebUI in an offline environment, you can set the `HF_HUB
 export HF_HUB_OFFLINE=1
 ```
 
+## Development Workflow 🛠️
+
+If you're interested in contributing to RAUX or need to test installer changes, please refer to our [Development Guide](docs/development.md). The guide provides detailed instructions for:
+
+- Making changes to installer components
+- Testing installer changes without creating releases
+- Using local artifacts for testing
+- Common troubleshooting steps
+
+For installer development, we now use a standalone Python 3.11 installation instead of conda, making it more consistent with GAIA's approach.
+
 ## License 📜
 
 This project is licensed under the [BSD-3-Clause License](LICENSE) - see the [LICENSE](LICENSE) file for details. 📄
