@@ -1,6 +1,5 @@
 # PowerShell script to launch RAUX and Lemonade
-# This script activates the conda environment for RAUX, runs both servers,
-# waits for them to be ready, and opens the browser
+# This script runs both servers, waits for them to be ready, and opens the browser
 
 # Clear the screen and set title
 Clear-Host
@@ -15,7 +14,7 @@ Write-Host "=================================================" -ForegroundColor 
 $version = " $($env:RAUX_VERSION)"
 
 # Parameters
-$condaEnvPath = $env:RAUX_CONDA_ENV
+$pythonPath = "$env:LOCALAPPDATA\RAUX\python\python.exe"
 $rauxUrl = "http://localhost:8080"
 $lemonadeUrl = "http://localhost:8000"
 $maxAttempts = 60  # Increased maximum attempts
@@ -202,17 +201,17 @@ function Start-LemonadeServer {
 
 # Function to launch and test RAUX server
 function Start-RAUXServer {
-    # Verify RAUX environment exists
-    if (-not (Test-Path $condaEnvPath)) {
-        Write-Host "ERROR: RAUX conda environment not found at $condaEnvPath" -ForegroundColor Red
+    # Verify Python executable exists
+    if (-not (Test-Path $pythonPath)) {
+        Write-Host "ERROR: Python executable not found at $pythonPath" -ForegroundColor Red
         Write-Host "Please ensure RAUX is properly installed." -ForegroundColor Red
         exit 1
     }
 
     Write-Host "Starting RAUX$version server..." -ForegroundColor Cyan
     $rauxPinfo = New-Object System.Diagnostics.ProcessStartInfo
-    $rauxPinfo.FileName = "cmd.exe"
-    $rauxPinfo.Arguments = "/C call conda activate $condaEnvPath && open-webui serve"
+    $rauxPinfo.FileName = $pythonPath
+    $rauxPinfo.Arguments = "-m open-webui serve"
     $rauxPinfo.RedirectStandardError = $false
     $rauxPinfo.RedirectStandardOutput = $false
     $rauxPinfo.UseShellExecute = $true

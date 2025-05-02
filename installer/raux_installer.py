@@ -10,9 +10,9 @@ import shutil
 from datetime import datetime
 import requests
 
-# We'll keep these for reference only
-CONDA_ENV_NAME = "raux_env"
-PYTHON_VERSION = "3.11"
+# Remove conda-related constants and replace with Python-specific ones
+PYTHON_VERSION = "3.11.8"  # Specific version for consistency
+PYTHON_DIR = "python"  # Directory name for standalone Python
 
 
 def install_raux(install_dir, debug=False):
@@ -34,7 +34,6 @@ def install_raux(install_dir, debug=False):
         level=log_level,
         format="[%(asctime)s] [RAUX-Installer] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
-        # Use filemode='a' to append to the existing log file instead of overwriting it
         handlers=[
             logging.FileHandler(log_file, mode="a"),
             logging.StreamHandler(sys.stdout),
@@ -50,7 +49,7 @@ def install_raux(install_dir, debug=False):
     # Verify parameters
     logging.info("Verifying parameters...")
     logging.info(f"INSTALL_DIR set to: {install_dir}")
-    logging.info("Using system Python for installation")
+    logging.info(f"Using Python {PYTHON_VERSION} for installation")
 
     if not install_dir:
         logging.error("ERROR: Installation directory parameter is missing")
@@ -77,10 +76,6 @@ def install_raux(install_dir, debug=False):
         raise ValueError(
             f"Cannot write to installation directory: {install_dir}. Exception: {str(e)}"
         )
-
-    # We'll use the system Python to run install.py
-    logging.info("Using system Python for installation")
-    logging.info("install.py will handle its own conda environment setup")
 
     logging.info("Starting RAUX download and installation...")
     logging.info(f"Installation directory: {install_dir}")
@@ -142,7 +137,6 @@ def install_raux(install_dir, debug=False):
         # Check if zip file exists
         if not os.path.exists("raux.zip"):
             logging.error("ERROR: Failed to download RAUX zip file")
-
             raise ValueError("Failed to download RAUX zip file")
 
         # Create extracted_files directory
@@ -156,11 +150,10 @@ def install_raux(install_dir, debug=False):
             with zipfile.ZipFile("raux.zip", "r") as zip_ref:
                 zip_ref.extractall(extract_dir)
         except Exception as e:
-
             logging.error(f"ERROR: Failed to extract RAUX zip file: {str(e)}")
             raise ValueError(f"Failed to extract RAUX zip file: {str(e)}")
 
-        # Look for .env.example in the extracted files and copy it to raux_env/Lib/.env
+        # Look for .env.example in the extracted files and copy it to python/Lib/.env
         logging.info("Looking for .env.example file...")
         env_example_path = None
         for root, dirs, files in os.walk(extract_dir):
@@ -170,7 +163,7 @@ def install_raux(install_dir, debug=False):
                     
         if env_example_path:
             logging.info(f"Found .env.example at: {env_example_path}")
-            env_dest_dir = os.path.join(install_dir, "raux_env", "Lib")
+            env_dest_dir = os.path.join(install_dir, PYTHON_DIR, "Lib")
             os.makedirs(env_dest_dir, exist_ok=True)
             env_dest_path = os.path.join(env_dest_dir, ".env")
             try:
@@ -205,7 +198,7 @@ def install_raux(install_dir, debug=False):
             logging.error("ERROR: Could not find install.py in extracted files")
             raise ValueError("Could not find install.py in extracted files")
 
-        # Run installation script using the system Python
+        # Run installation script using the standalone Python
         logging.info(f"Found install script: {install_script}")
 
         # Close log handlers to prevent file locking issues
@@ -225,10 +218,10 @@ def install_raux(install_dir, debug=False):
             ],
         )
 
-        # Build the command using the system Python
-        # Let install.py handle its own conda environment setup
+        # Build the command using the standalone Python
+        python_path = os.path.join(install_dir, PYTHON_DIR, "python.exe")
         cmd = [
-            "python",  # Use the system Python to run install.py
+            python_path,
             install_script,
             "--install-dir",
             install_dir,
@@ -363,13 +356,12 @@ def install_raux(install_dir, debug=False):
         else:
             logging.info("Installation completed successfully.")
             logging.info("You can start RAUX by running:")
-            logging.info("  conda activate raux_env")
             logging.info("  raux")
             logging.info("Or by using the desktop shortcut if created.")
 
         logging.info("===== INSTALLATION SUMMARY =====")
         logging.info(f"Installation directory: {install_dir}")
-        logging.info("Using system Python for installation")
+        logging.info(f"Python version: {PYTHON_VERSION}")
         logging.info(
             f"Launcher scripts copied: PS1={launcher_ps1_found}, CMD={launcher_cmd_found}"
         )

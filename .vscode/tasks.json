@@ -16,12 +16,23 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "Run RAUX Installer",
+			"type": "shell",
+			"command": "${workspaceFolder}/installer/Installer-UX.exe",
+			"group": "build",
+			"presentation": {
+				"reveal": "always",
+				"panel": "new"
+			},
+			"problemMatcher": []
+		},
+		{
 			"label": "Clean RAUX Environment: AppData",
 			"type": "shell",
 			"command": "cmd",
 			"args": [
 				"/c",
-				"conda deactivate & rmdir /s /q \"%LOCALAPPDATA%\\RAUX\" & del /f /q \"%USERPROFILE%\\Desktop\\GAIA-UI-BETA.lnk\" & conda env remove -n raux_env -y"
+				"rmdir /s /q \"%LOCALAPPDATA%\\RAUX\" & del /f /q \"%USERPROFILE%\\Desktop\\GAIA-UI-BETA.lnk\""
 			],
 			"presentation": {
 				"reveal": "silent",

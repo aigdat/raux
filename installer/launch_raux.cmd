@@ -1,40 +1,26 @@
 @echo off
-title RAUX Server
+REM Batch script to launch RAUX and Lemonade
+REM This script runs both servers, waits for them to be ready, and opens the browser
 
-REM Set default version and mode, override if provided as parameters
-set "version=unknown"
-set "mode=GENERIC"
-
-REM Parse command line parameters
-:parse
-if "%1"=="--version" (
-    set "version=%2"
-    shift
-    shift
-    goto parse
-)
-if "%1"=="--mode" (
-    set "mode=%2"
-    shift
-    shift
-    goto parse
-)
-
-REM Set RAUX conda environment path
-set "RAUX_CONDA_ENV=%LOCALAPPDATA%\RAUX\raux_env"
-
-REM Check if mode is not GENERIC to determine if Lemonade should be launched
-if /I NOT "%mode%"=="GENERIC" (
-    set "LAUNCH_LEMONADE=true"
+REM Set version with default value
+if "%RAUX_VERSION%"=="" (
+    set "RAUX_VERSION= "
 ) else (
-    set "LAUNCH_LEMONADE=false"
+    set "RAUX_VERSION= %RAUX_VERSION%"
 )
 
-REM Set environment variables for PowerShell script
-set "RAUX_VERSION=%version%"
+REM Set paths
+set "PYTHON_PATH=%LOCALAPPDATA%\RAUX\python\python.exe"
+set "RAUX_URL=http://localhost:8080"
+set "LEMONADE_URL=http://localhost:8000"
 
-REM Launch RAUX with appropriate environment variables
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%LOCALAPPDATA%\RAUX\launch_raux.ps1'"
-echo RAUX Server has stopped.
+REM Verify Python executable exists
+if not exist "%PYTHON_PATH%" (
+    echo ERROR: Python executable not found at %PYTHON_PATH%
+    echo Please ensure RAUX is properly installed.
+    pause
+    exit /b 1
+)
 
-pause
+REM Start PowerShell script
+powershell -ExecutionPolicy Bypass -File "%~dp0launch_raux.ps1"
