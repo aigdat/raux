@@ -250,16 +250,19 @@ def install_raux(install_dir, debug=False, log_file=None, version=None, local_re
             handler.close()
             logging.root.removeHandler(handler)
 
-        # Reinitialize logging with append mode
+        # Reinitialize logging with append mode - always use append at this point
+        # since we've already been logging to the file
         logging.basicConfig(
             level=log_level,
             format="[%(asctime)s] [RAUX-Installer] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
             handlers=[
-                logging.FileHandler(log_file, mode=log_mode),
+                logging.FileHandler(log_file, mode="a"),  # Always use append mode here
                 logging.StreamHandler(sys.stdout),
             ],
         )
+        
+        logging.info("\n===== RAUX INSTALLER CONTINUING AFTER HANDLER RESET =====")
 
         # Build the command using the standalone Python
         python_path = os.path.join(install_dir, PYTHON_DIR, "python.exe")

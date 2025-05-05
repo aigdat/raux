@@ -91,17 +91,31 @@ Function InitializeLog
   ; Debug the log file path
   DetailPrint "Log file path: $LogFilePath"
   
-  ; Clear the existing log file
-  FileOpen $0 $LogFilePath "w"
-  FileWrite $0 "=== ${PRODUCT_NAME} Installation Log ===\r\n"
-  FileWrite $0 "Version: ${RAUX_RELEASE_VERSION}\r\n"
-  FileWrite $0 "LogFile: $LogFilePath\r\n"
-  FileWrite $0 "======================================\r\n\r\n"
-  FileClose $0
+  ; Check if log file exists - append to it if it does
+  IfFileExists "$LogFilePath" log_append log_create
   
-  ; Push a message to the log using our LogMessage function
-  Push "Installer initialization completed for log file: $LogFilePath"
-  Call LogMessage
+  log_create:
+    ; Create a new log file
+    FileOpen $0 $LogFilePath "w"
+    FileWrite $0 "=== ${PRODUCT_NAME} Installation Log ===\r\n"
+    FileWrite $0 "Version: ${RAUX_RELEASE_VERSION}\r\n"
+    FileWrite $0 "LogFile: $LogFilePath\r\n"
+    FileWrite $0 "======================================\r\n\r\n"
+    FileClose $0
+    Goto log_done
+    
+  log_append:
+    ; Append to existing log
+    FileOpen $0 $LogFilePath "a"
+    FileWrite $0 "\r\n\r\n=== ${PRODUCT_NAME} Installation Continuing ===\r\n"
+    FileWrite $0 "Version: ${RAUX_RELEASE_VERSION}\r\n"
+    FileWrite $0 "======================================\r\n\r\n"
+    FileClose $0
+    
+  log_done:
+    ; Push a message to the log using our LogMessage function
+    Push "Installer initialization completed for log file: $LogFilePath"
+    Call LogMessage
 FunctionEnd
 
 Function .onInit
@@ -362,7 +376,7 @@ Section "Install Main Components" SEC01
         
         ; Use PowerShell for more reliable parameter passing with paths
         DetailPrint "Running installer script using PowerShell for better parameter handling..."
-        nsExec::ExecToLog 'powershell -Command "& ''$PythonPath'' ''$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py'' --install-dir ''$LOCALAPPDATA\${PROJECT_NAME}'' --debug --log-file ''$LogFilePath'' --version ''${RAUX_RELEASE_VERSION}'' --local-release ''$LocalReleasePath''"'
+        nsExec::ExecToLog 'powershell -Command "\"$PythonPath\" \"$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py\" --install-dir \"$LOCALAPPDATA\${PROJECT_NAME}\" --debug --log-file \"$LogFilePath\" --version \"${RAUX_RELEASE_VERSION}\" --local-release \"$LocalReleasePath\""'
         Pop $R0
       ${Else}
         Push "Command to execute (standard GitHub download):"

@@ -71,12 +71,69 @@ The RAUX installer was updated to support a `/LOCAL_RELEASE` flag that should by
    - Added troubleshooting guidance for common issues
    - Explained the benefits of using local releases for testing
 
+## Additional Bug Fixes
+
+### 1. Log File Overwriting Issue in NSIS Script
+We identified and fixed an issue where the installer was overwriting the log file instead of appending to it:
+   - **Root Cause**: The `InitializeLog` function in Installer-UX.nsi was using write mode ("w") to open the log file regardless of whether it already existed
+   - **Fix**: Modified the function to check if the log file exists first and use append mode if it does
+   - **Implementation**:
+     ```nsi
+     ; Check if log file exists - append to it if it does
+     IfFileExists "$LogFilePath" log_append log_create
+     
+     log_create:
+       ; Create a new log file
+       FileOpen $0 $LogFilePath "w"
+       ; ...
+
+     log_append:
+       ; Append to existing log
+       FileOpen $0 $LogFilePath "a"
+       ; ...
+     ```
+
+### 2. Log File Overwriting Issue in Python Script
+We identified a second issue where the log file was being overwritten due to a problem in the Python script:
+   - **Root Cause**: The `raux_installer.py` script reinitializes logging after closing handlers, but uses the original `log_mode` variable which might be "w" if the file didn't exist at the start
+   - **Fix**: Modified the second logging initialization to always use append mode ("a") since we know we've already been writing to the file
+   - **Implementation**:
+     ```python
+     # Reinitialize logging with append mode - always use append at this point
+     # since we've already been logging to the file
+     logging.basicConfig(
+         level=log_level,
+         format="[%(asctime)s] [RAUX-Installer] %(message)s",
+         datefmt="%Y-%m-%d %H:%M:%S",
+         handlers=[
+             logging.FileHandler(log_file, mode="a"),  # Always use append mode here
+             logging.StreamHandler(sys.stdout),
+         ],
+     )
+     
+     logging.info("\n===== RAUX INSTALLER CONTINUING AFTER HANDLER RESET =====")
+     ```
+
+### 3. PowerShell Command Syntax Error
+We fixed a syntax error in the PowerShell command used to execute the Python installer:
+   - **Root Cause**: The command was using the PowerShell `&` call operator incorrectly, resulting in a "Missing expression after '&' in pipeline element" error
+   - **Fix**: Revised the PowerShell command to use direct execution with quoted paths instead of the `&` operator
+   - **Implementation**:
+     ```nsi
+     ; Before:
+     nsExec::ExecToLog 'powershell -Command "& ''$PythonPath'' ''$LOCAL_PATH'' ..."'
+     
+     ; After:
+     nsExec::ExecToLog 'powershell -Command "\"$PythonPath\" \"$LOCAL_PATH\" ..."'
+     ```
+
 ## Next Steps
 
 1. **Testing**
    - Test the installer with a valid local release file
    - Verify the local path is correctly passed and processed
    - Monitor logs to ensure GitHub download is bypassed
+   - Check that logs are properly appended to rather than overwritten
 
 ## Implementation Summary
 
@@ -87,5 +144,7 @@ We've successfully implemented a comprehensive fix for the `/LOCAL_RELEASE` flag
 3. Adding robust error handling for local file access issues
 4. Using PowerShell for safer command execution with complex paths
 5. Adding comprehensive documentation for developers
+6. Fixing log overwriting issues in both NSIS and Python scripts
+7. Fixing PowerShell command syntax errors
 
 These changes should ensure that the `/LOCAL_RELEASE` parameter works correctly, allowing developers to test installer changes locally without requiring GitHub releases, saving time and simplifying the development workflow.
