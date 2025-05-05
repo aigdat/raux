@@ -14,128 +14,37 @@ import requests
 PYTHON_VERSION = "3.11.8"  # Specific version for consistency
 PYTHON_DIR = "python"  # Directory name for standalone Python
 
-# Create a custom FileHandler that logs debug info
-class DebugFileHandler(logging.FileHandler):
-    def __init__(self, filename, mode='a', encoding=None, delay=False):
-        # ALWAYS force append mode no matter what
-        mode = 'a'
-        
-        print(f"DEBUG-HANDLER: Creating file handler for {filename} with FORCED append mode")
-        
-        # Check if file exists before proceeding
-        file_exists = os.path.exists(filename)
-        print(f"DEBUG-HANDLER: File exists check: {file_exists}")
-        
-        # If parent directory doesn't exist, create it
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        
-        # If file doesn't exist, create it with a header
-        if not file_exists:
-            try:
-                with open(filename, "a") as f:
-                    f.write(f"=== NEW LOG FILE CREATED: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n")
-                print(f"DEBUG-HANDLER: Created new log file with header")
-            except Exception as e:
-                print(f"DEBUG-HANDLER: Error creating log file: {str(e)}")
-        else:
-            # If file exists, add a continuation marker
-            try:
-                with open(filename, "a") as f:
-                    f.write(f"\n\n=== LOG CONTINUED: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n\n")
-                print(f"DEBUG-HANDLER: Added continuation marker to existing log file")
-            except Exception as e:
-                print(f"DEBUG-HANDLER: Error adding continuation marker: {str(e)}")
-        
-        try:
-            super().__init__(filename, mode, encoding, delay)
-            print(f"DEBUG-HANDLER: Successfully initialized handler in append mode")
-        except Exception as e:
-            print(f"DEBUG-HANDLER: Error initializing handler: {str(e)}")
-        
-    def emit(self, record):
-        try:
-            # Extra check to ensure the file exists and is writable
-            if not os.path.exists(self.baseFilename):
-                print(f"DEBUG-HANDLER: Warning - Log file disappeared, recreating: {self.baseFilename}")
-                with open(self.baseFilename, "a") as f:
-                    f.write(f"=== LOG FILE RECREATED: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n")
-            
-            print(f"DEBUG-HANDLER: Writing to log file: {self.baseFilename}")
-            super().emit(record)
-        except Exception as e:
-            print(f"DEBUG-HANDLER: Error emitting log record: {str(e)}")
-            # Try one more time with a direct file write
-            try:
-                with open(self.baseFilename, "a") as f:
-                    formatted_record = self.format(record)
-                    f.write(f"{formatted_record}\n")
-                print(f"DEBUG-HANDLER: Recovered using direct file write")
-            except Exception as e2:
-                print(f"DEBUG-HANDLER: Failed recovery attempt: {str(e2)}")
 
-
-def install_raux(install_dir, debug=False, log_file=None, version=None, local_release=None):
+def install_raux(install_dir, debug=False):
     """
     Install RAUX (Windows-only).
 
     Args:
         install_dir (str): Directory where RAUX will be installed
         debug (bool): Enable debug logging
-        log_file (str): Custom log file path
-        version (str): Specific version to install (e.g., "v0.6.5+raux.0.1.0.ab30cdb")
-        local_release (str): Path to a local release file to use instead of downloading
 
     Returns:
         int: Exit code (0 for success, non-zero for failure)
     """
     # Setup logging to both console and file
-    if log_file is None or not log_file.strip():
-        log_file = os.path.join(install_dir, "raux_install.log")
-        print(f"*** DEBUG: No log file specified, using default: {log_file}")
-    else:
-        # Ensure the log file doesn't have any unexpected characters
-        log_file = log_file.strip()
-        print(f"*** DEBUG: Log file specified: {log_file}")
-        # Make sure the parent directory exists
-        os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        print(f"*** DEBUG: Created parent directory: {os.path.dirname(log_file)}")
+    log_file = os.path.join(install_dir, "raux_install.log")
 
-    # Ensure the log file path is absolute
-    if not os.path.isabs(log_file):
-        old_log_file = log_file
-        log_file = os.path.abspath(log_file)
-        print(f"*** DEBUG: Converted relative log path {old_log_file} to absolute: {log_file}")
-        
-    # Check if log file already exists - if it does, append to it
-    append_mode = os.path.exists(log_file)
-    log_mode = "a" if append_mode else "w"
-    
-    # Add explicit print statements that will show up in the console output
-    print(f"*** DEBUG: Log file exists check: {append_mode}")
-    print(f"*** DEBUG: Log mode selected: {log_mode}")
-    print(f"*** DEBUG: Log file path: {log_file}")
-    
     log_level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(
         level=log_level,
         format="[%(asctime)s] [RAUX-Installer] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
-            DebugFileHandler(log_file, mode=log_mode),
+            logging.FileHandler(log_file, mode="a"),
             logging.StreamHandler(sys.stdout),
         ],
     )
 
     # Start installation
-    if append_mode:
-        logging.info("\n\n===== RAUX INSTALLER CONTINUING =====")
-    else:
-        logging.info("===== RAUX INSTALLER =====")
+    logging.info("===== RAUX INSTALLER =====")
     logging.info(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logging.info(f"Current directory: {os.getcwd()}")
-    logging.info(f"Using log file: {log_file} (in {log_mode} mode)")
-    if version:
-        logging.info(f"Requested specific version: {version}")
+    logging.info(f"Log file: {log_file}")
 
     # Verify parameters
     logging.info("Verifying parameters...")
@@ -193,62 +102,37 @@ def install_raux(install_dir, debug=False, log_file=None, version=None, local_re
                 f"Cannot create test file in temporary directory: {str(e)}"
             )
 
-        # Get the URL based on version parameter or latest release
-        logging.info("Determining download URL...")
-        
-        if local_release:
-            logging.info(f"Using local release file: {local_release}")
-            logging.info(f"Local file exists check: {os.path.exists(local_release)}")
-            logging.info(f"Local file absolute path: {os.path.abspath(local_release)}")
-            # Skip download entirely and just copy the local file
+        # Get the latest release URL
+        logging.info("Fetching the latest release URL...")
+        download_url = get_latest_release_url()
+        logging.info(f"Using download URL: {download_url}")
+
+        # Download the zip file
+        logging.info(f"Downloading from {download_url}")
+
+        try:
+            # Install requests if not already installed
             try:
-                if not os.path.exists(local_release):
-                    logging.error(f"ERROR: Local release file does not exist: {local_release}")
-                    raise ValueError(f"Local release file does not exist: {local_release}")
-                
-                shutil.copy2(local_release, "raux.zip")
-                logging.info(f"Copied local release file to raux.zip")
-                logging.info(f"Destination file exists: {os.path.exists('raux.zip')}")
-                logging.info(f"Destination file size: {os.path.getsize('raux.zip')} bytes")
+                subprocess.run(
+                    ["python", "-m", "pip", "install", "requests"],
+                    check=True,
+                    capture_output=True,
+                )
+                logging.info("Installed requests package")
             except Exception as e:
-                logging.error(f"ERROR: Failed to copy local release file: {str(e)}")
-                raise ValueError(f"Failed to copy local release file: {str(e)}")
-        else:
-            if version:
-                # Use specific version instead of fetching latest
-                download_url = get_specific_version_url(version)
-            else:
-                # Fallback to latest release if no version specified
-                download_url = get_latest_release_url()
-                
-            logging.info(f"Using download URL: {download_url}")
+                logging.error(f"ERROR: Failed to install requests package: {str(e)}")
+                raise ValueError(f"Failed to install requests package: {str(e)}")
 
-            # Download the zip file
-            logging.info(f"Downloading from {download_url}")
+            response = requests.get(download_url, stream=True, timeout=60)
+            response.raise_for_status()
 
-            try:
-                # Install requests if not already installed
-                try:
-                    subprocess.run(
-                        ["python", "-m", "pip", "install", "requests"],
-                        check=True,
-                        capture_output=True,
-                    )
-                    logging.info("Installed requests package")
-                except Exception as e:
-                    logging.error(f"ERROR: Failed to install requests package: {str(e)}")
-                    raise ValueError(f"Failed to install requests package: {str(e)}")
+            with open("raux.zip", "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
 
-                response = requests.get(download_url, stream=True, timeout=60)
-                response.raise_for_status()
-
-                with open("raux.zip", "wb") as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-
-            except Exception as e:
-                logging.error(f"ERROR: Failed to download RAUX zip file: {str(e)}")
-                raise ValueError(f"Failed to download RAUX zip file: {str(e)}")
+        except Exception as e:
+            logging.error(f"ERROR: Failed to download RAUX zip file: {str(e)}")
+            raise ValueError(f"Failed to download RAUX zip file: {str(e)}")
 
         # Check if zip file exists
         if not os.path.exists("raux.zip"):
@@ -319,56 +203,20 @@ def install_raux(install_dir, debug=False, log_file=None, version=None, local_re
 
         # Close log handlers to prevent file locking issues
         logging.info("Closing log handlers to prevent file locking issues...")
-        # Save all existing log messages to ensure they're not lost
-        log_buffer = []
         for handler in logging.root.handlers[:]:
-            if isinstance(handler, logging.FileHandler):
-                # Try to get the current log file content
-                try:
-                    with open(handler.baseFilename, 'r') as f:
-                        log_buffer.append(f.read())
-                except Exception as e:
-                    print(f"Error reading log file before closing handler: {str(e)}")
-            
-            # Now close the handler
             handler.close()
             logging.root.removeHandler(handler)
 
-        # Print that we're reinitializing logging
-        print(f"*** DEBUG: Reinitializing logging for file: {log_file}")
-        print(f"*** DEBUG: Using forced append mode")
-        
-        # IMPORTANT: Always verify log file still exists before continuing
-        if os.path.exists(log_file):
-            print(f"*** DEBUG: Log file still exists at: {log_file}")
-        else:
-            print(f"*** DEBUG: Log file no longer exists at: {log_file} - creating new file")
-            # Create directory if needed
-            os.makedirs(os.path.dirname(log_file), exist_ok=True)
-            # Create empty file with header
-            with open(log_file, 'a') as f:
-                f.write(f"=== NEW LOG FILE CREATED AFTER HANDLER RESET: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n\n")
-        
-        # Now explicitly write continuation marker
-        try:
-            with open(log_file, 'a') as f:
-                f.write(f"\n\n===== RAUX INSTALLER CONTINUING AFTER HANDLER RESET ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) =====\n\n")
-        except Exception as e:
-            print(f"*** DEBUG: Error writing continuation marker: {str(e)}")
-        
-        # Reinitialize logging with append mode - always use append at this point
-        # since we've already been logging to the file
+        # Reinitialize logging with append mode
         logging.basicConfig(
             level=log_level,
             format="[%(asctime)s] [RAUX-Installer] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
             handlers=[
-                DebugFileHandler(log_file, mode="a"),  # Always use append mode here
+                logging.FileHandler(log_file, mode="a"),
                 logging.StreamHandler(sys.stdout),
             ],
         )
-        
-        logging.info("RAUX installation continuing after log handlers reset")
 
         # Build the command using the standalone Python
         python_path = os.path.join(install_dir, PYTHON_DIR, "python.exe")
@@ -579,48 +427,15 @@ def get_latest_release_url():
         raise ValueError(f"Error fetching release info: {str(e)}")
 
 
-def get_specific_version_url(version):
-    """
-    Construct the download URL for a specific version.
-    
-    Args:
-        version (str): The version string (e.g., "v0.6.5+raux.0.1.0.ab30cdb")
-        
-    Returns:
-        str: The download URL
-    """
-    # Remove leading 'v' if present for filename
-    filename_version = version[1:] if version.startswith('v') else version
-    
-    # Construct full URL
-    return f"https://github.com/aigdat/raux/releases/download/{version}/raux-{filename_version}-setup.zip"
-
-
 if __name__ == "__main__":
-    # Add debug logging for command line arguments
-    print("\n========== DEBUG: COMMAND LINE ARGUMENTS ==========")
-    print(f"Script path: {sys.argv[0]}")
-    print("Arguments received:")
-    for i, arg in enumerate(sys.argv[1:], 1):
-        print(f"  Arg {i}: {arg}")
-    print("==================================================\n")
-    
     # If run directly, parse command line arguments
     import argparse
 
     parser = argparse.ArgumentParser(description="RAUX Installer (Windows-only)")
     parser.add_argument("--install-dir", required=True, help="Installation directory")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    parser.add_argument("--log-file", help="Custom log file path")
-    parser.add_argument("--version", help="Specific version to install")
-    parser.add_argument("--local-release", help="Path to a local release file to use instead of downloading")
 
     args = parser.parse_args()
-    
-    # Log the parsed arguments as well
-    if args.local_release:
-        print(f"DEBUG: Local release path after parsing: {args.local_release}")
-        print(f"DEBUG: Local release path exists: {os.path.exists(args.local_release)}")
 
-    exit_code = install_raux(args.install_dir, args.debug, args.log_file, args.version, args.local_release)
+    exit_code = install_raux(args.install_dir, args.debug)
     sys.exit(exit_code)
