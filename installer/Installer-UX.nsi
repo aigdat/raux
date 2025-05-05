@@ -361,77 +361,142 @@ Section "Install Main Components" SEC01
       DetailPrint "- Installation directory: $LOCALAPPDATA\${PROJECT_NAME}"
       DetailPrint "- Using standalone Python for the entire installation process"
       DetailPrint "- RAUX version: ${RAUX_RELEASE_VERSION}"
-    
-      ; Execute the Python script with the required parameters using standalone Python
-      Push "Executing installer script with Python"
-      Call LogMessage
-
-      ; Enhanced logging to diagnose command execution
-      ${If} $LocalReleasePath != ""
-        ; Log exact command with clear formatting for debugging
-        Push "Command to execute (with local release):"
+      
+      ; Check if log file exists before running the Python script
+      IfFileExists "$LogFilePath" log_exists_before_script log_missing_before_script
+      
+      log_exists_before_script:
+        DetailPrint "LOG CHECK: Log file exists before running Python script: $LogFilePath"
+        Push "LOG CHECK: Log file exists before running Python script: $LogFilePath"
         Call LogMessage
-        Push "$PythonPath $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py --install-dir $LOCALAPPDATA\${PROJECT_NAME} --debug --log-file $LogFilePath --version ${RAUX_RELEASE_VERSION} --local-release $LocalReleasePath"
+        Goto continue_script_execution
+        
+      log_missing_before_script:
+        DetailPrint "LOG CHECK: Log file does NOT exist before running Python script: $LogFilePath"
+        Push "LOG CHECK: Log file does NOT exist before running Python script: $LogFilePath"
         Call LogMessage
         
-        ; Use PowerShell for more reliable parameter passing with paths
-        DetailPrint "Running installer script using PowerShell for better parameter handling..."
-        nsExec::ExecToLog 'powershell -Command "\"$PythonPath\" \"$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py\" --install-dir \"$LOCALAPPDATA\${PROJECT_NAME}\" --debug --log-file \"$LogFilePath\" --version \"${RAUX_RELEASE_VERSION}\" --local-release \"$LocalReleasePath\""'
-        Pop $R0
-      ${Else}
-        Push "Command to execute (standard GitHub download):"
-        Call LogMessage 
-        Push "$PythonPath $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py --install-dir $LOCALAPPDATA\${PROJECT_NAME} --debug --log-file $LogFilePath --version ${RAUX_RELEASE_VERSION}"
+      continue_script_execution:
+        ; Execute the Python script with the required parameters using standalone Python
+        Push "Executing installer script with Python"
         Call LogMessage
         
-        ; Standard execution for GitHub downloads
-        DetailPrint "Running: $PythonPath $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py --install-dir $LOCALAPPDATA\${PROJECT_NAME} --debug --log-file $LogFilePath --version ${RAUX_RELEASE_VERSION}"
-        ExecWait '"$PythonPath" "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py" --install-dir "$LOCALAPPDATA\${PROJECT_NAME}" --debug --log-file "$LogFilePath" --version "${RAUX_RELEASE_VERSION}"' $R0
-      ${EndIf}
+        ; Verify log file exists before running Python script
+        IfFileExists "$LogFilePath" log_exists_before_python log_missing_before_python
+        
+        log_missing_before_python:
+          DetailPrint "WARNING: Log file does not exist before running Python: $LogFilePath"
+          Push "WARNING: Log file does not exist before running Python: $LogFilePath"
+          Call LogMessage
+          ; Create an empty log file to ensure it exists
+          FileOpen $0 $LogFilePath "a"
+          FileWrite $0 "=== Log file created before Python execution ===\r\n"
+          FileClose $0
+          Goto run_python_installer
+          
+        log_exists_before_python:
+          DetailPrint "Log file check: File exists before Python execution: $LogFilePath"
+          Push "Log file check: File exists before Python execution: $LogFilePath"
+          Call LogMessage
+          
+        run_python_installer:
+          ; Enhanced logging to diagnose command execution
+          ${If} $LocalReleasePath != ""
+            ; Log exact command with clear formatting for debugging
+            Push "Command to execute (with local release):"
+            Call LogMessage
+            Push "$PythonPath $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py --install-dir $LOCALAPPDATA\${PROJECT_NAME} --debug --log-file $LogFilePath --version ${RAUX_RELEASE_VERSION} --local-release $LocalReleasePath"
+            Call LogMessage
+            
+            ; Use PowerShell for more reliable parameter passing with paths
+            DetailPrint "Running installer script using PowerShell for better parameter handling..."
+            nsExec::ExecToLog 'powershell -Command "\"$PythonPath\" \"$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py\" --install-dir \"$LOCALAPPDATA\${PROJECT_NAME}\" --debug --log-file \"$LogFilePath\" --version \"${RAUX_RELEASE_VERSION}\" --local-release \"$LocalReleasePath\""'
+            Pop $R0
+          ${Else}
+            Push "Command to execute (standard GitHub download):"
+            Call LogMessage 
+            Push "$PythonPath $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py --install-dir $LOCALAPPDATA\${PROJECT_NAME} --debug --log-file $LogFilePath --version ${RAUX_RELEASE_VERSION}"
+            Call LogMessage
+            
+            ; Standard execution for GitHub downloads
+            DetailPrint "Running: $PythonPath $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py --install-dir $LOCALAPPDATA\${PROJECT_NAME} --debug --log-file $LogFilePath --version ${RAUX_RELEASE_VERSION}"
+            ExecWait '"$PythonPath" "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py" --install-dir "$LOCALAPPDATA\${PROJECT_NAME}" --debug --log-file "$LogFilePath" --version "${RAUX_RELEASE_VERSION}"' $R0
+          ${EndIf}
 
-      DetailPrint "${PRODUCT_NAME} installation exit code: $R0"
-      Push "${PRODUCT_NAME} installation exit code: $R0"
-      Call LogMessage
-      
-      ; Check if installation was successful
-      ${If} $R0 == 0
-        DetailPrint "*** ${PRODUCT_NAME} INSTALLATION COMPLETED ***"
-        Push "*** ${PRODUCT_NAME} INSTALLATION COMPLETED ***"
-        Call LogMessage
-      ${Else}
-        DetailPrint "*** ${PRODUCT_NAME} INSTALLATION FAILED ***"
-        Push "*** ${PRODUCT_NAME} INSTALLATION FAILED ***"
-        Call LogMessage
-        Push "For additional support, please contact support@amd.com and include the log file: $LogFilePath"
-        Call LogMessage
-        ${IfNot} ${Silent}
-          MessageBox MB_OK "${PRODUCT_NAME} installation failed.$\n$\nPlease check the log file at:$\n$LogFilePath$\n$\nfor detailed error information."
-        ${EndIf}
-      ${EndIf}
-      
-      ; IMPORTANT: Do NOT attempt to clean up the temporary directory
-      ; This is intentional to prevent file-in-use errors
-      ; The directory will be left for the system to clean up later
-      DetailPrint "- Intentionally NOT cleaning up temporary directory to prevent file-in-use errors"
-      SetOutPath "$INSTDIR"
-      
-      ; Create RAUX shortcut - using the GAIA icon but pointing to RAUX installation
-      DetailPrint "- Creating ${PROJECT_NAME} desktop shortcut"
-      
-      ; Copy the launcher scripts to the RAUX installation directory if they exist
-      DetailPrint "- Copying ${PROJECT_NAME} launcher scripts"
-      
-      ; Use /nonfatal flag to prevent build failure if files don't exist
-      File /nonfatal "/oname=$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.ps1" "${__FILE__}\..\launch_${PROJECT_NAME_CONCAT}.ps1"
-      File /nonfatal "/oname=$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.cmd" "${__FILE__}\..\launch_${PROJECT_NAME_CONCAT}.cmd"
-      
-      ; Copy the icon file to the RAUX installation directory
-      DetailPrint "- Copying ${PROJECT_NAME} icon file"
-      File "/oname=${ICON_DEST}" "${ICON_FILE}"
-      
-      ; Create shortcut to the batch wrapper script (will appear as a standalone app)
-      DetailPrint "- Creating desktop shortcut with version ${RAUX_RELEASE_VERSION}"
-      CreateShortcut "$DESKTOP\GAIA-UI-BETA.lnk" "$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.cmd" "--version ${RAUX_RELEASE_VERSION}" "${ICON_DEST}"
+          DetailPrint "${PRODUCT_NAME} installation exit code: $R0"
+          Push "${PRODUCT_NAME} installation exit code: $R0"
+          Call LogMessage
+          
+          ; Check if log file exists after running the Python script
+          IfFileExists "$LogFilePath" log_exists_after_script log_missing_after_script
+          
+          log_exists_after_script:
+            DetailPrint "LOG CHECK: Log file exists after running Python script: $LogFilePath"
+            Push "LOG CHECK: Log file exists after running Python script: $LogFilePath"
+            Call LogMessage
+            Goto continue_after_script
+            
+          log_missing_after_script:
+            DetailPrint "LOG CHECK: Log file does NOT exist after running Python script: $LogFilePath"
+            Push "LOG CHECK: Log file does NOT exist after running Python script: $LogFilePath"
+            Call LogMessage
+            
+          continue_after_script:
+            ; Check if installation was successful
+            ${If} $R0 == 0
+              DetailPrint "*** ${PRODUCT_NAME} INSTALLATION COMPLETED ***"
+              Push "*** ${PRODUCT_NAME} INSTALLATION COMPLETED ***"
+              Call LogMessage
+            ${Else}
+              DetailPrint "*** ${PRODUCT_NAME} INSTALLATION FAILED ***"
+              Push "*** ${PRODUCT_NAME} INSTALLATION FAILED ***"
+              Call LogMessage
+              Push "For additional support, please contact support@amd.com and include the log file: $LogFilePath"
+              Call LogMessage
+              ${IfNot} ${Silent}
+                MessageBox MB_OK "${PRODUCT_NAME} installation failed.$\n$\nPlease check the log file at:$\n$LogFilePath$\n$\nfor detailed error information."
+              ${EndIf}
+            ${EndIf}
+            
+            ; IMPORTANT: Do NOT attempt to clean up the temporary directory
+            ; This is intentional to prevent file-in-use errors
+            ; The directory will be left for the system to clean up later
+            DetailPrint "- Intentionally NOT cleaning up temporary directory to prevent file-in-use errors"
+            SetOutPath "$INSTDIR"
+            
+            ; Create RAUX shortcut - using the GAIA icon but pointing to RAUX installation
+            DetailPrint "- Creating ${PROJECT_NAME} desktop shortcut"
+            
+            ; Copy the launcher scripts to the RAUX installation directory if they exist
+            DetailPrint "- Copying ${PROJECT_NAME} launcher scripts"
+            
+            ; Use /nonfatal flag to prevent build failure if files don't exist
+            File /nonfatal "/oname=$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.ps1" "${__FILE__}\..\launch_${PROJECT_NAME_CONCAT}.ps1"
+            File /nonfatal "/oname=$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.cmd" "${__FILE__}\..\launch_${PROJECT_NAME_CONCAT}.cmd"
+            
+            ; Copy the icon file to the RAUX installation directory
+            DetailPrint "- Copying ${PROJECT_NAME} icon file"
+            File "/oname=${ICON_DEST}" "${ICON_FILE}"
+            
+            ; Create shortcut to the batch wrapper script (will appear as a standalone app)
+            DetailPrint "- Creating desktop shortcut with version ${RAUX_RELEASE_VERSION}"
+            CreateShortcut "$DESKTOP\GAIA-UI-BETA.lnk" "$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.cmd" "--version ${RAUX_RELEASE_VERSION}" "${ICON_DEST}"
+
+            ; Final log file check
+            IfFileExists "$LogFilePath" log_exists_final log_missing_final
+            
+            log_exists_final:
+              DetailPrint "FINAL LOG CHECK: Log file exists at end of installation: $LogFilePath"
+              Push "FINAL LOG CHECK: Log file exists at end of installation: $LogFilePath"
+              Call LogMessage
+              Goto final_check_done
+              
+            log_missing_final:
+              DetailPrint "FINAL LOG CHECK: Log file does NOT exist at end of installation: $LogFilePath"
+              Push "FINAL LOG CHECK: Log file does NOT exist at end of installation: $LogFilePath"
+              Call LogMessage
+              
+            final_check_done:
 
 SectionEnd
 

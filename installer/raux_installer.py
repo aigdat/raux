@@ -14,6 +14,28 @@ import requests
 PYTHON_VERSION = "3.11.8"  # Specific version for consistency
 PYTHON_DIR = "python"  # Directory name for standalone Python
 
+# Create a custom FileHandler that logs debug info
+class DebugFileHandler(logging.FileHandler):
+    def __init__(self, filename, mode='a', encoding=None, delay=False):
+        print(f"DEBUG-HANDLER: Creating file handler for {filename} with mode {mode}")
+        
+        # Force append mode if file exists, regardless of what mode was requested
+        if os.path.exists(filename) and mode == 'w':
+            print(f"DEBUG-HANDLER: File exists but 'w' mode specified - FORCING append mode")
+            mode = 'a'  # Force append mode if file exists
+        
+        with open(filename, mode="r" if os.path.exists(filename) and mode != "w" else "a") as f:
+            if mode == "a" and os.path.exists(filename):
+                print(f"DEBUG-HANDLER: File already exists, contents start with: {f.read(100)}")
+            else:
+                print(f"DEBUG-HANDLER: File doesn't exist or being opened in write mode: {mode}")
+        
+        super().__init__(filename, mode, encoding, delay)
+        
+    def emit(self, record):
+        print(f"DEBUG-HANDLER: Writing to log file: {self.baseFilename}")
+        super().emit(record)
+
 
 def install_raux(install_dir, debug=False, log_file=None, version=None, local_release=None):
     """
@@ -32,15 +54,29 @@ def install_raux(install_dir, debug=False, log_file=None, version=None, local_re
     # Setup logging to both console and file
     if log_file is None or not log_file.strip():
         log_file = os.path.join(install_dir, "raux_install.log")
+        print(f"*** DEBUG: No log file specified, using default: {log_file}")
     else:
         # Ensure the log file doesn't have any unexpected characters
         log_file = log_file.strip()
+        print(f"*** DEBUG: Log file specified: {log_file}")
         # Make sure the parent directory exists
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        print(f"*** DEBUG: Created parent directory: {os.path.dirname(log_file)}")
 
+    # Ensure the log file path is absolute
+    if not os.path.isabs(log_file):
+        old_log_file = log_file
+        log_file = os.path.abspath(log_file)
+        print(f"*** DEBUG: Converted relative log path {old_log_file} to absolute: {log_file}")
+        
     # Check if log file already exists - if it does, append to it
     append_mode = os.path.exists(log_file)
     log_mode = "a" if append_mode else "w"
+    
+    # Add explicit print statements that will show up in the console output
+    print(f"*** DEBUG: Log file exists check: {append_mode}")
+    print(f"*** DEBUG: Log mode selected: {log_mode}")
+    print(f"*** DEBUG: Log file path: {log_file}")
     
     log_level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(
@@ -48,7 +84,7 @@ def install_raux(install_dir, debug=False, log_file=None, version=None, local_re
         format="[%(asctime)s] [RAUX-Installer] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
-            logging.FileHandler(log_file, mode=log_mode),
+            DebugFileHandler(log_file, mode=log_mode),
             logging.StreamHandler(sys.stdout),
         ],
     )
@@ -250,6 +286,25 @@ def install_raux(install_dir, debug=False, log_file=None, version=None, local_re
             handler.close()
             logging.root.removeHandler(handler)
 
+        # Print that we're reinitializing logging
+        print(f"*** DEBUG: Reinitializing logging for file: {log_file}")
+        print(f"*** DEBUG: Using forced append mode")
+        
+        # IMPORTANT: Always verify log file still exists before continuing
+        if os.path.exists(log_file):
+            print(f"*** DEBUG: Log file still exists at: {log_file}")
+            # If the file exists but is empty, write an initial header
+            if os.path.getsize(log_file) == 0:
+                print(f"*** DEBUG: Log file exists but is empty, writing initial header")
+                with open(log_file, "a") as f:
+                    f.write("=== RAUX Installer Log ===\n")
+        else:
+            print(f"*** DEBUG: Log file no longer exists at: {log_file} - creating new file")
+            # Create directory if needed
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            with open(log_file, "a") as f:
+                f.write("=== RAUX Installer Log (Recreated) ===\n")
+        
         # Reinitialize logging with append mode - always use append at this point
         # since we've already been logging to the file
         logging.basicConfig(
@@ -257,7 +312,7 @@ def install_raux(install_dir, debug=False, log_file=None, version=None, local_re
             format="[%(asctime)s] [RAUX-Installer] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
             handlers=[
-                logging.FileHandler(log_file, mode="a"),  # Always use append mode here
+                DebugFileHandler(log_file, mode="a"),  # Always use append mode here
                 logging.StreamHandler(sys.stdout),
             ],
         )
