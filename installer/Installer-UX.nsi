@@ -91,26 +91,53 @@ Function InitializeLog
   ; Debug the log file path
   DetailPrint "Log file path: $LogFilePath"
   
-  ; Check if log file exists - append to it if it does
-  IfFileExists "$LogFilePath" log_append log_create
+  ; First, check if the log file exists and read its content if it does
+  IfFileExists "$LogFilePath" save_log_content create_new_log
   
-  log_create:
+  save_log_content:
+    ; Create a temporary file to store existing log content
+    FileOpen $1 "$LogFilePath" "r"
+    FileOpen $2 "$TEMP\log_backup.txt" "w"
+    log_read_loop:
+      FileRead $1 $3
+      IfErrors log_read_done
+      FileWrite $2 $3
+      Goto log_read_loop
+    log_read_done:
+    FileClose $1
+    FileClose $2
+    Goto append_to_log
+    
+  create_new_log:
     ; Create a new log file
-    FileOpen $0 $LogFilePath "w"
+    FileOpen $0 "$LogFilePath" "w"
     FileWrite $0 "=== ${PRODUCT_NAME} Installation Log ===\r\n"
     FileWrite $0 "Version: ${RAUX_RELEASE_VERSION}\r\n"
     FileWrite $0 "LogFile: $LogFilePath\r\n"
+    FileWrite $0 "Started: ${__DATE__} ${__TIME__}\r\n"
     FileWrite $0 "======================================\r\n\r\n"
     FileClose $0
     Goto log_done
     
-  log_append:
-    ; Append to existing log
-    FileOpen $0 $LogFilePath "a"
+  append_to_log:
+    ; Append to existing log with separator
+    FileOpen $0 "$LogFilePath" "w"  ; Temporarily overwrite to add header
     FileWrite $0 "\r\n\r\n=== ${PRODUCT_NAME} Installation Continuing ===\r\n"
     FileWrite $0 "Version: ${RAUX_RELEASE_VERSION}\r\n"
+    FileWrite $0 "Continued: ${__DATE__} ${__TIME__}\r\n"
     FileWrite $0 "======================================\r\n\r\n"
+    
+    ; Restore previous content below the new header
+    FileOpen $1 "$TEMP\log_backup.txt" "r"
+    log_copy_loop:
+      FileRead $1 $3
+      IfErrors log_copy_done
+      FileWrite $0 $3
+      Goto log_copy_loop
+    log_copy_done:
+    FileClose $1
     FileClose $0
+    Delete "$TEMP\log_backup.txt"
     
   log_done:
     ; Push a message to the log using our LogMessage function
@@ -144,14 +171,28 @@ FunctionEnd
 Function LogMessage
   Exch $0 ; Get message from stack
   
-  ; Always open in append mode to prevent overwriting
-  FileOpen $1 $LogFilePath "a"
-  ; Make sure to not add \r\n to the path itself
-  FileWrite $1 "$0$\r$\n"
-  FileClose $1
+  ; Check if log file exists first
+  IfFileExists "$LogFilePath" log_file_exists log_file_missing
   
-  ; Also output to detail window
-  DetailPrint "$0"
+  log_file_missing:
+    ; If log file is missing, recreate it first with a header
+    DetailPrint "WARNING: Log file missing - recreating: $LogFilePath"
+    FileOpen $1 "$LogFilePath" "w"
+    FileWrite $1 "=== LOG FILE RECREATED: ${__DATE__} ${__TIME__} ===\r\n\r\n"
+    FileWrite $1 "$0$\r$\n"
+    FileClose $1
+    Goto log_message_done
+  
+  log_file_exists:
+    ; Always open in append mode to prevent overwriting
+    FileOpen $1 "$LogFilePath" "a"
+    ; Make sure to not add \r\n to the path itself
+    FileWrite $1 "$0$\r$\n"
+    FileClose $1
+  
+  log_message_done:
+    ; Also output to detail window
+    DetailPrint "$0"
   
   Pop $0
 FunctionEnd

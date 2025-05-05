@@ -17,24 +17,53 @@ PYTHON_DIR = "python"  # Directory name for standalone Python
 # Create a custom FileHandler that logs debug info
 class DebugFileHandler(logging.FileHandler):
     def __init__(self, filename, mode='a', encoding=None, delay=False):
-        print(f"DEBUG-HANDLER: Creating file handler for {filename} with mode {mode}")
+        # ALWAYS force append mode no matter what
+        mode = 'a'
         
-        # Force append mode if file exists, regardless of what mode was requested
-        if os.path.exists(filename) and mode == 'w':
-            print(f"DEBUG-HANDLER: File exists but 'w' mode specified - FORCING append mode")
-            mode = 'a'  # Force append mode if file exists
+        print(f"DEBUG-HANDLER: Creating file handler for {filename} with FORCED append mode")
         
-        with open(filename, mode="r" if os.path.exists(filename) and mode != "w" else "a") as f:
-            if mode == "a" and os.path.exists(filename):
-                print(f"DEBUG-HANDLER: File already exists, contents start with: {f.read(100)}")
-            else:
-                print(f"DEBUG-HANDLER: File doesn't exist or being opened in write mode: {mode}")
+        # Check if file exists before proceeding
+        file_exists = os.path.exists(filename)
+        print(f"DEBUG-HANDLER: File exists check: {file_exists}")
         
-        super().__init__(filename, mode, encoding, delay)
+        # If parent directory doesn't exist, create it
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        
+        # If file doesn't exist, create it with a header
+        if not file_exists:
+            try:
+                with open(filename, "a") as f:
+                    f.write(f"=== NEW LOG FILE CREATED: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n")
+                print(f"DEBUG-HANDLER: Created new log file with header")
+            except Exception as e:
+                print(f"DEBUG-HANDLER: Error creating log file: {str(e)}")
+        
+        try:
+            super().__init__(filename, mode, encoding, delay)
+            print(f"DEBUG-HANDLER: Successfully initialized handler in append mode")
+        except Exception as e:
+            print(f"DEBUG-HANDLER: Error initializing handler: {str(e)}")
         
     def emit(self, record):
-        print(f"DEBUG-HANDLER: Writing to log file: {self.baseFilename}")
-        super().emit(record)
+        try:
+            # Extra check to ensure the file exists and is writable
+            if not os.path.exists(self.baseFilename):
+                print(f"DEBUG-HANDLER: Warning - Log file disappeared, recreating: {self.baseFilename}")
+                with open(self.baseFilename, "a") as f:
+                    f.write(f"=== LOG FILE RECREATED: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n")
+            
+            print(f"DEBUG-HANDLER: Writing to log file: {self.baseFilename}")
+            super().emit(record)
+        except Exception as e:
+            print(f"DEBUG-HANDLER: Error emitting log record: {str(e)}")
+            # Try one more time with a direct file write
+            try:
+                with open(self.baseFilename, "a") as f:
+                    formatted_record = self.format(record)
+                    f.write(f"{formatted_record}\n")
+                print(f"DEBUG-HANDLER: Recovered using direct file write")
+            except Exception as e2:
+                print(f"DEBUG-HANDLER: Failed recovery attempt: {str(e2)}")
 
 
 def install_raux(install_dir, debug=False, log_file=None, version=None, local_release=None):
@@ -282,7 +311,18 @@ def install_raux(install_dir, debug=False, log_file=None, version=None, local_re
 
         # Close log handlers to prevent file locking issues
         logging.info("Closing log handlers to prevent file locking issues...")
+        # Save all existing log messages to ensure they're not lost
+        log_buffer = []
         for handler in logging.root.handlers[:]:
+            if isinstance(handler, logging.FileHandler):
+                # Try to get the current log file content
+                try:
+                    with open(handler.baseFilename, 'r') as f:
+                        log_buffer.append(f.read())
+                except Exception as e:
+                    print(f"Error reading log file before closing handler: {str(e)}")
+            
+            # Now close the handler
             handler.close()
             logging.root.removeHandler(handler)
 
@@ -293,17 +333,29 @@ def install_raux(install_dir, debug=False, log_file=None, version=None, local_re
         # IMPORTANT: Always verify log file still exists before continuing
         if os.path.exists(log_file):
             print(f"*** DEBUG: Log file still exists at: {log_file}")
-            # If the file exists but is empty, write an initial header
-            if os.path.getsize(log_file) == 0:
-                print(f"*** DEBUG: Log file exists but is empty, writing initial header")
-                with open(log_file, "a") as f:
-                    f.write("=== RAUX Installer Log ===\n")
+            # Read any existing content to preserve it
+            try:
+                with open(log_file, 'r') as f:
+                    existing_content = f.read()
+                    if existing_content:
+                        log_buffer.append(existing_content)
+            except Exception as e:
+                print(f"*** DEBUG: Error reading existing log file: {str(e)}")
         else:
             print(f"*** DEBUG: Log file no longer exists at: {log_file} - creating new file")
             # Create directory if needed
             os.makedirs(os.path.dirname(log_file), exist_ok=True)
-            with open(log_file, "a") as f:
-                f.write("=== RAUX Installer Log (Recreated) ===\n")
+        
+        # Now explicitly write all content back in append mode, with a clear continuation marker
+        try:
+            with open(log_file, 'a') as f:
+                f.write("\n\n===== RAUX INSTALLER CONTINUING AFTER HANDLER RESET =====\n\n")
+                # Log the buffer content if not already in the file
+                for buf in log_buffer:
+                    if buf and buf.strip():  # Only write non-empty buffers
+                        f.write(buf + "\n")
+        except Exception as e:
+            print(f"*** DEBUG: Error ensuring log file continuity: {str(e)}")
         
         # Reinitialize logging with append mode - always use append at this point
         # since we've already been logging to the file
