@@ -37,6 +37,14 @@ class DebugFileHandler(logging.FileHandler):
                 print(f"DEBUG-HANDLER: Created new log file with header")
             except Exception as e:
                 print(f"DEBUG-HANDLER: Error creating log file: {str(e)}")
+        else:
+            # If file exists, add a continuation marker
+            try:
+                with open(filename, "a") as f:
+                    f.write(f"\n\n=== LOG CONTINUED: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n\n")
+                print(f"DEBUG-HANDLER: Added continuation marker to existing log file")
+            except Exception as e:
+                print(f"DEBUG-HANDLER: Error adding continuation marker: {str(e)}")
         
         try:
             super().__init__(filename, mode, encoding, delay)
@@ -333,29 +341,20 @@ def install_raux(install_dir, debug=False, log_file=None, version=None, local_re
         # IMPORTANT: Always verify log file still exists before continuing
         if os.path.exists(log_file):
             print(f"*** DEBUG: Log file still exists at: {log_file}")
-            # Read any existing content to preserve it
-            try:
-                with open(log_file, 'r') as f:
-                    existing_content = f.read()
-                    if existing_content:
-                        log_buffer.append(existing_content)
-            except Exception as e:
-                print(f"*** DEBUG: Error reading existing log file: {str(e)}")
         else:
             print(f"*** DEBUG: Log file no longer exists at: {log_file} - creating new file")
             # Create directory if needed
             os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            # Create empty file with header
+            with open(log_file, 'a') as f:
+                f.write(f"=== NEW LOG FILE CREATED AFTER HANDLER RESET: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n\n")
         
-        # Now explicitly write all content back in append mode, with a clear continuation marker
+        # Now explicitly write continuation marker
         try:
             with open(log_file, 'a') as f:
-                f.write("\n\n===== RAUX INSTALLER CONTINUING AFTER HANDLER RESET =====\n\n")
-                # Log the buffer content if not already in the file
-                for buf in log_buffer:
-                    if buf and buf.strip():  # Only write non-empty buffers
-                        f.write(buf + "\n")
+                f.write(f"\n\n===== RAUX INSTALLER CONTINUING AFTER HANDLER RESET ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) =====\n\n")
         except Exception as e:
-            print(f"*** DEBUG: Error ensuring log file continuity: {str(e)}")
+            print(f"*** DEBUG: Error writing continuation marker: {str(e)}")
         
         # Reinitialize logging with append mode - always use append at this point
         # since we've already been logging to the file
@@ -369,7 +368,7 @@ def install_raux(install_dir, debug=False, log_file=None, version=None, local_re
             ],
         )
         
-        logging.info("\n===== RAUX INSTALLER CONTINUING AFTER HANDLER RESET =====")
+        logging.info("RAUX installation continuing after log handlers reset")
 
         # Build the command using the standalone Python
         python_path = os.path.join(install_dir, PYTHON_DIR, "python.exe")

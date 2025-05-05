@@ -121,22 +121,13 @@ Function InitializeLog
     
   append_to_log:
     ; Append to existing log with separator
-    FileOpen $0 "$LogFilePath" "w"  ; Temporarily overwrite to add header
+    FileOpen $0 "$LogFilePath" "a"  ; Open in append mode to preserve existing content
     FileWrite $0 "\r\n\r\n=== ${PRODUCT_NAME} Installation Continuing ===\r\n"
     FileWrite $0 "Version: ${RAUX_RELEASE_VERSION}\r\n"
     FileWrite $0 "Continued: ${__DATE__} ${__TIME__}\r\n"
     FileWrite $0 "======================================\r\n\r\n"
-    
-    ; Restore previous content below the new header
-    FileOpen $1 "$TEMP\log_backup.txt" "r"
-    log_copy_loop:
-      FileRead $1 $3
-      IfErrors log_copy_done
-      FileWrite $0 $3
-      Goto log_copy_loop
-    log_copy_done:
-    FileClose $1
     FileClose $0
+    ; Remove temporary backup file
     Delete "$TEMP\log_backup.txt"
     
   log_done:
