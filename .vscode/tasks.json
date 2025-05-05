@@ -28,6 +28,21 @@
 			"dependsOn": "Build RAUX Installer"
 		},
 		{
+			"label": "Run RAUX Installer with Local Release",
+			"type": "shell",
+			"command": "${workspaceFolder}/installer/Installer-UX.exe",
+			"args": [
+				"/LOCAL_RELEASE=${input:localReleasePath}"
+			],
+			"group": "build",
+			"presentation": {
+				"reveal": "always",
+				"panel": "new"
+			},
+			"problemMatcher": [],
+			"dependsOn": "Build RAUX Installer"
+		},
+		{
 			"label": "Clean RAUX Environment: AppData",
 			"type": "shell",
 			"command": "cmd",
@@ -125,6 +140,12 @@
 			"type": "command",
 			"command": "workbench.action.tasks.terminate",
 			"args": "start-frontend"
+		},
+		{
+			"id": "localReleasePath",
+			"type": "promptString",
+			"description": "Path to the manually downloaded PR artifact zip file",
+			"default": "${workspaceFolder}/artifacts/raux-setup.zip"
 		}
 	]
 }

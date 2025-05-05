@@ -57,6 +57,44 @@ After making your changes, create a Pull Request. This will trigger GitHub Actio
    ```
    This ensures a clean state for subsequent tests.
 
+## Testing Installer Changes with Local Releases
+
+If you need to test installer changes without creating a GitHub release, you can use the `/LOCAL_RELEASE` parameter to specify a local ZIP file instead of downloading from GitHub.
+
+### Using the LOCAL_RELEASE Parameter
+
+1. **Create a local release package:**
+   
+   Create a ZIP file with the necessary installer components. The structure should match what would normally be included in a GitHub release.
+
+2. **Running the installer with a local release:**
+
+   ```powershell
+   # Run the installer with a local release file
+   .\Installer.exe /LOCAL_RELEASE="C:\path\to\your\release.zip"
+   ```
+
+3. **Important considerations:**
+   
+   - The specified path must be an absolute path to an existing ZIP file
+   - Paths with spaces should be properly quoted
+   - The ZIP file structure should match the expected release structure
+   - The installer will log the local file path and skip GitHub download entirely
+
+### Debugging LOCAL_RELEASE Issues
+
+If you encounter issues with the `/LOCAL_RELEASE` parameter:
+
+1. Check the installer log file at `%LOCALAPPDATA%\RAUX\raux_install.log`
+2. Verify the local file exists and is accessible
+3. Ensure the ZIP file contains all required components
+4. Try using a path without spaces or special characters
+
+This feature is particularly useful for:
+- Testing installer changes without creating GitHub releases
+- Working in offline environments
+- Testing with custom builds or configurations
+
 ## Local Release Parameter
 
 The installer includes a `/LOCAL_RELEASE` parameter that allows you to specify a local release file instead of downloading from GitHub. This is particularly useful during development and testing.
@@ -67,7 +105,24 @@ The installer includes a `/LOCAL_RELEASE` parameter that allows you to specify a
 Installer-UX.exe /LOCAL_RELEASE=path/to/raux-setup.zip
 ```
 
-This parameter tells the installer to use the local file instead of attempting to download from GitHub, allowing you to test changes without publishing releases.
+When this parameter is provided, the installer will:
+1. **Skip** downloading any files from GitHub
+2. Use **only** the specified local release file
+3. Copy the file to a temporary location and extract it
+4. Proceed with installation using the local files
+
+This completely bypasses the GitHub release download mechanism, allowing you to test installer changes without any internet dependency or GitHub access.
+
+### Example Workflow
+
+1. Make changes to installer scripts
+2. Build the installer with VS Code task: "Build RAUX Installer"
+3. Download PR artifacts from GitHub Actions
+4. Test your changes using:
+   ```
+   Installer-UX.exe /LOCAL_RELEASE=C:\path\to\artifacts\raux-setup.zip
+   ```
+5. Verify the installer log shows: "Using local release file: [your-path]" instead of attempting any GitHub downloads
 
 ## Build Artifacts
 

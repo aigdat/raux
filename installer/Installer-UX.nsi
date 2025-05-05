@@ -22,6 +22,7 @@ RequestExecutionLevel user
 !define /ifndef PRODUCT_NAME "RAUX"
 !define /ifndef PROJECT_NAME "RAUX"
 !define /ifndef PROJECT_NAME_CONCAT "raux"
+!define /ifndef RAUX_RELEASE_VERSION "v0.6.5+raux.0.1.0.4f7c160"
 !define /ifndef GITHUB_REPO "https://github.com/aigdat/${PROJECT_NAME_CONCAT}.git"
 !define /ifndef EMPTY_FILE_NAME "empty_file.txt"
 !define /ifndef ICON_FILE "${__FILE__}\..\..\static\${PROJECT_NAME_CONCAT}.ico"
@@ -31,7 +32,6 @@ RequestExecutionLevel user
 !define /ifndef PYTHON_EMBED_URL "https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip"
 !define /ifndef GET_PIP_URL "https://bootstrap.pypa.io/get-pip.py"
 ; Add configurable release version parameter
-!define /ifndef RAUX_RELEASE_VERSION "v0.6.5+raux.0.1.0.ab30cdb"
 !define RAUX_RELEASE_BASE_URL "https://github.com/aigdat/raux/releases/download/${RAUX_RELEASE_VERSION}"
 
 ; This is a compile-time fix to make sure that our selfhost CI runner can successfully install,
@@ -48,6 +48,7 @@ InstallDir "$LOCALAPPDATA\${PROJECT_NAME}"
 Var PythonPath
 Var LogFilePath
 Var RauxReleaseURL
+Var LocalReleasePath ; Variable for local release path that bypasses GitHub downloads
 
 ; Finish Page settings
 !define MUI_TEXT_FINISH_INFO_TITLE "${PRODUCT_NAME} installed successfully!"
@@ -78,9 +79,6 @@ LangString MUI_TEXT_FINISH_TITLE "${LANG_ENGLISH}" "Installation Complete"
 LangString MUI_TEXT_FINISH_SUBTITLE "${LANG_ENGLISH}" "Thank you for installing ${PRODUCT_NAME}!"
 LangString MUI_TEXT_ABORT_TITLE "${LANG_ENGLISH}" "Installation Aborted"
 LangString MUI_TEXT_ABORT_SUBTITLE "${LANG_ENGLISH}" "Installation has been aborted."
-LangString MUI_BUTTONTEXT_FINISH "${LANG_ENGLISH}" "Finish"
-LangString MUI_TEXT_LICENSE_TITLE ${LANG_ENGLISH} "License Agreement"
-LangString MUI_TEXT_LICENSE_SUBTITLE ${LANG_ENGLISH} "Please review the license terms before installing ${PRODUCT_NAME}."
 
 ; Use a simple log initialization function with a fixed path
 Function InitializeLog
@@ -109,6 +107,20 @@ FunctionEnd
 Function .onInit
   ; Initialize variables
   StrCpy $PythonPath "$LOCALAPPDATA\${PROJECT_NAME}\${PYTHON_DIR}\python.exe"
+  StrCpy $LocalReleasePath "" ; Initialize to empty string
+  
+  ; Process command line parameters
+  ${GetParameters} $R0
+  DetailPrint "Command line parameters: $R0"
+  ${GetOptions} $R0 "/LOCAL_RELEASE=" $LocalReleasePath
+  
+  ; If LocalReleasePath is not empty, log it
+  ${If} $LocalReleasePath != ""
+    DetailPrint "Local release path specified: $LocalReleasePath"
+    DetailPrint "Will use local file instead of downloading from GitHub"
+  ${Else}
+    DetailPrint "No local release path specified, will download from GitHub"
+  ${EndIf}
   
   ; Initialize the log file
   Call InitializeLog
@@ -290,93 +302,122 @@ Section "Install Main Components" SEC01
     File "LICENSE"
     File ${ICON_FILE}
 
-    install_app:
-      DetailPrint "--------------------------"
-      DetailPrint "- ${PROJECT_NAME} Installation -"
-      DetailPrint "--------------------------"
+    ; Start RAUX installation
+    DetailPrint "--------------------------"
+    DetailPrint "- ${PROJECT_NAME} Installation -"
+    DetailPrint "--------------------------"
 
-      DetailPrint "- Creating ${PROJECT_NAME} installation directory..."
-      CreateDirectory "$LOCALAPPDATA\${PROJECT_NAME}"
-      
-      DetailPrint "- Creating temporary directory for ${PROJECT_NAME} installation..."
-      CreateDirectory "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp"
-      SetOutPath "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp"
-      
-      DetailPrint "- Preparing for ${PROJECT_NAME} installation..."
-      
-      ; Download the release from GitHub
-      DetailPrint "- Downloading RAUX release ${RAUX_RELEASE_VERSION}..."
-      Push "Starting download of RAUX release ${RAUX_RELEASE_VERSION}"
+    DetailPrint "- Creating ${PROJECT_NAME} installation directory..."
+    CreateDirectory "$LOCALAPPDATA\${PROJECT_NAME}"
+    
+    DetailPrint "- Creating temporary directory for ${PROJECT_NAME} installation..."
+    CreateDirectory "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp"
+    SetOutPath "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp"
+    
+    DetailPrint "- Preparing for ${PROJECT_NAME} installation..."
+    
+    ; Check if we're using a local release or downloading
+    DetailPrint "Local release path is: $LocalReleasePath"
+    ${If} $LocalReleasePath != ""
+      DetailPrint "Using local release file - skipping GitHub download"
+    ${Else}
+      DetailPrint "No local release file specified - will download from GitHub"
+    ${EndIf}
+    
+    ; Download the release from GitHub or use local file
+    DetailPrint "- Getting RAUX release ${RAUX_RELEASE_VERSION}..."
+    Push "Starting acquisition of RAUX release ${RAUX_RELEASE_VERSION}"
+    Call LogMessage
+    Call DownloadRelease
+    
+    ; Copy the Python installer script to the temp directory (should be in the downloaded release)
+    DetailPrint "- Checking for installer script in downloaded release..."
+    IfFileExists "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py" found_installer_script copy_installer_script
+
+    copy_installer_script:
+      DetailPrint "- Installer script not found in release, using bundled script..."
+      File "${PROJECT_NAME_CONCAT}_installer.py"
+      Goto continue_installation
+
+    found_installer_script:
+      DetailPrint "- Using installer script from downloaded release..."
+
+    continue_installation:
+      DetailPrint "- Using Python script: $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py"
+      DetailPrint "- Installation directory: $LOCALAPPDATA\${PROJECT_NAME}"
+      DetailPrint "- Using standalone Python for the entire installation process"
+      DetailPrint "- RAUX version: ${RAUX_RELEASE_VERSION}"
+    
+      ; Execute the Python script with the required parameters using standalone Python
+      Push "Executing installer script with Python"
       Call LogMessage
-      Call DownloadRelease
-      
-      ; Copy the Python installer script to the temp directory (should be in the downloaded release)
-      DetailPrint "- Checking for installer script in downloaded release..."
-      IfFileExists "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py" found_installer_script copy_installer_script
 
-      copy_installer_script:
-        DetailPrint "- Installer script not found in release, using bundled script..."
-        File "${PROJECT_NAME_CONCAT}_installer.py"
-        Goto continue_installation
-
-      found_installer_script:
-        DetailPrint "- Using installer script from downloaded release..."
-
-      continue_installation:
-        DetailPrint "- Using Python script: $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py"
-        DetailPrint "- Installation directory: $LOCALAPPDATA\${PROJECT_NAME}"
-        DetailPrint "- Using standalone Python for the entire installation process"
-        DetailPrint "- RAUX version: ${RAUX_RELEASE_VERSION}"
-      
-        ; Execute the Python script with the required parameters using standalone Python
-        Push "Executing installer script with Python"
+      ; Enhanced logging to diagnose command execution
+      ${If} $LocalReleasePath != ""
+        ; Log exact command with clear formatting for debugging
+        Push "Command to execute (with local release):"
         Call LogMessage
+        Push "$PythonPath $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py --install-dir $LOCALAPPDATA\${PROJECT_NAME} --debug --log-file $LogFilePath --version ${RAUX_RELEASE_VERSION} --local-release $LocalReleasePath"
+        Call LogMessage
+        
+        ; Use PowerShell for more reliable parameter passing with paths
+        DetailPrint "Running installer script using PowerShell for better parameter handling..."
+        nsExec::ExecToLog 'powershell -Command "& ''$PythonPath'' ''$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py'' --install-dir ''$LOCALAPPDATA\${PROJECT_NAME}'' --debug --log-file ''$LogFilePath'' --version ''${RAUX_RELEASE_VERSION}'' --local-release ''$LocalReleasePath''"'
+        Pop $R0
+      ${Else}
+        Push "Command to execute (standard GitHub download):"
+        Call LogMessage 
+        Push "$PythonPath $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py --install-dir $LOCALAPPDATA\${PROJECT_NAME} --debug --log-file $LogFilePath --version ${RAUX_RELEASE_VERSION}"
+        Call LogMessage
+        
+        ; Standard execution for GitHub downloads
         DetailPrint "Running: $PythonPath $LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py --install-dir $LOCALAPPDATA\${PROJECT_NAME} --debug --log-file $LogFilePath --version ${RAUX_RELEASE_VERSION}"
         ExecWait '"$PythonPath" "$LOCALAPPDATA\${PROJECT_NAME}\${PROJECT_NAME_CONCAT}_temp\${PROJECT_NAME_CONCAT}_installer.py" --install-dir "$LOCALAPPDATA\${PROJECT_NAME}" --debug --log-file "$LogFilePath" --version "${RAUX_RELEASE_VERSION}"' $R0
+      ${EndIf}
 
-        DetailPrint "${PRODUCT_NAME} installation exit code: $R0"
-        Push "${PRODUCT_NAME} installation exit code: $R0"
+      DetailPrint "${PRODUCT_NAME} installation exit code: $R0"
+      Push "${PRODUCT_NAME} installation exit code: $R0"
+      Call LogMessage
+      
+      ; Check if installation was successful
+      ${If} $R0 == 0
+        DetailPrint "*** ${PRODUCT_NAME} INSTALLATION COMPLETED ***"
+        Push "*** ${PRODUCT_NAME} INSTALLATION COMPLETED ***"
         Call LogMessage
-        
-        ; Check if installation was successful
-        ${If} $R0 == 0
-          DetailPrint "*** ${PRODUCT_NAME} INSTALLATION COMPLETED ***"
-          Push "*** ${PRODUCT_NAME} INSTALLATION COMPLETED ***"
-          Call LogMessage
-        ${Else}
-          DetailPrint "*** ${PRODUCT_NAME} INSTALLATION FAILED ***"
-          Push "*** ${PRODUCT_NAME} INSTALLATION FAILED ***"
-          Call LogMessage
-          Push "For additional support, please contact support@amd.com and include the log file: $LogFilePath"
-          Call LogMessage
-          ${IfNot} ${Silent}
-            MessageBox MB_OK "${PRODUCT_NAME} installation failed.$\n$\nPlease check the log file at:$\n$LogFilePath$\n$\nfor detailed error information."
-          ${EndIf}
+      ${Else}
+        DetailPrint "*** ${PRODUCT_NAME} INSTALLATION FAILED ***"
+        Push "*** ${PRODUCT_NAME} INSTALLATION FAILED ***"
+        Call LogMessage
+        Push "For additional support, please contact support@amd.com and include the log file: $LogFilePath"
+        Call LogMessage
+        ${IfNot} ${Silent}
+          MessageBox MB_OK "${PRODUCT_NAME} installation failed.$\n$\nPlease check the log file at:$\n$LogFilePath$\n$\nfor detailed error information."
         ${EndIf}
-        
-        ; IMPORTANT: Do NOT attempt to clean up the temporary directory
-        ; This is intentional to prevent file-in-use errors
-        ; The directory will be left for the system to clean up later
-        DetailPrint "- Intentionally NOT cleaning up temporary directory to prevent file-in-use errors"
-        SetOutPath "$INSTDIR"
-        
-        ; Create RAUX shortcut - using the GAIA icon but pointing to RAUX installation
-        DetailPrint "- Creating ${PROJECT_NAME} desktop shortcut"
-        
-        ; Copy the launcher scripts to the RAUX installation directory if they exist
-        DetailPrint "- Copying ${PROJECT_NAME} launcher scripts"
-        
-        ; Use /nonfatal flag to prevent build failure if files don't exist
-        File /nonfatal "/oname=$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.ps1" "${__FILE__}\..\launch_${PROJECT_NAME_CONCAT}.ps1"
-        File /nonfatal "/oname=$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.cmd" "${__FILE__}\..\launch_${PROJECT_NAME_CONCAT}.cmd"
-        
-        ; Copy the icon file to the RAUX installation directory
-        DetailPrint "- Copying ${PROJECT_NAME} icon file"
-        File "/oname=${ICON_DEST}" "${ICON_FILE}"
-        
-        ; Create shortcut to the batch wrapper script (will appear as a standalone app)
-        DetailPrint "- Creating desktop shortcut with version ${RAUX_RELEASE_VERSION}"
-        CreateShortcut "$DESKTOP\GAIA-UI-BETA.lnk" "$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.cmd" "--version ${RAUX_RELEASE_VERSION}" "${ICON_DEST}"
+      ${EndIf}
+      
+      ; IMPORTANT: Do NOT attempt to clean up the temporary directory
+      ; This is intentional to prevent file-in-use errors
+      ; The directory will be left for the system to clean up later
+      DetailPrint "- Intentionally NOT cleaning up temporary directory to prevent file-in-use errors"
+      SetOutPath "$INSTDIR"
+      
+      ; Create RAUX shortcut - using the GAIA icon but pointing to RAUX installation
+      DetailPrint "- Creating ${PROJECT_NAME} desktop shortcut"
+      
+      ; Copy the launcher scripts to the RAUX installation directory if they exist
+      DetailPrint "- Copying ${PROJECT_NAME} launcher scripts"
+      
+      ; Use /nonfatal flag to prevent build failure if files don't exist
+      File /nonfatal "/oname=$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.ps1" "${__FILE__}\..\launch_${PROJECT_NAME_CONCAT}.ps1"
+      File /nonfatal "/oname=$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.cmd" "${__FILE__}\..\launch_${PROJECT_NAME_CONCAT}.cmd"
+      
+      ; Copy the icon file to the RAUX installation directory
+      DetailPrint "- Copying ${PROJECT_NAME} icon file"
+      File "/oname=${ICON_DEST}" "${ICON_FILE}"
+      
+      ; Create shortcut to the batch wrapper script (will appear as a standalone app)
+      DetailPrint "- Creating desktop shortcut with version ${RAUX_RELEASE_VERSION}"
+      CreateShortcut "$DESKTOP\GAIA-UI-BETA.lnk" "$LOCALAPPDATA\${PROJECT_NAME}\launch_${PROJECT_NAME_CONCAT}.cmd" "--version ${RAUX_RELEASE_VERSION}" "${ICON_DEST}"
 
 SectionEnd
 
@@ -384,34 +425,69 @@ Function RunAmdOpenWebUI
   ExecShell "open" "http://localhost:8080/"
 FunctionEnd
 
-; Add function to download release assets from GitHub
+; Function to download release assets from GitHub or use local file
 Function DownloadRelease
-  ; Remove the 'v' prefix for the filename if present
-  StrCpy $1 ${RAUX_RELEASE_VERSION} 1
-  ${If} $1 == "v"
-    StrCpy $1 ${RAUX_RELEASE_VERSION} "" 1  ; Get substring starting from position 1 (skipping 'v')
-    StrCpy $RauxReleaseURL "${RAUX_RELEASE_BASE_URL}/raux-$1-setup.zip"
-  ${Else}
-    StrCpy $RauxReleaseURL "${RAUX_RELEASE_BASE_URL}/raux-${RAUX_RELEASE_VERSION}-setup.zip"
-  ${EndIf}
-  
-  ; Download the asset file
-  Push "Downloading RAUX release ${RAUX_RELEASE_VERSION}"
-  Call LogMessage
-  Push "URL: $RauxReleaseURL"
+  ; Check if a local release path was specified
+  DetailPrint "Local release path value: '$LocalReleasePath'"
+  Push "LOCAL_RELEASE parameter value: '$LocalReleasePath'"
   Call LogMessage
   
-  ExecWait 'curl -L -o "$TEMP\raux-release.zip" "$RauxReleaseURL"' $0
-  
-  ${If} $0 != 0
-    Push "ERROR: Failed to download release"
+  ${If} $LocalReleasePath != ""
+    ; Use local release file instead of downloading from GitHub
+    Push "Using local release file: $LocalReleasePath"
     Call LogMessage
-    ${IfNot} ${Silent}
-      MessageBox MB_OK "Failed to download release from GitHub. Please check your internet connection and try again."
+    Push "Skipping GitHub download entirely"
+    Call LogMessage
+    
+    ; Verify the file exists with explicit logging
+    IfFileExists "$LocalReleasePath" local_release_file_exists local_release_file_missing
+    
+    local_release_file_missing:
+      Push "ERROR: Specified local release file does not exist: $LocalReleasePath"
+      Call LogMessage
+      ${IfNot} ${Silent}
+        MessageBox MB_OK "The specified local release file does not exist:$\n$LocalReleasePath$\n$\nPlease check the path and try again."
+      ${EndIf}
+      Quit
+    
+    local_release_file_exists:
+      ; Copy local file to temp directory with better path handling
+      Push "Copying local release file to temp directory..."
+      Call LogMessage
+      CopyFiles "$LocalReleasePath" "$TEMP\raux-release.zip"
+      Push "Local file copied to: $TEMP\raux-release.zip"
+      Call LogMessage
+      Goto extract_release
+  ${Else}
+    ; Use GitHub release URL - standard download process
+    ; Remove the 'v' prefix for the filename if present
+    StrCpy $1 ${RAUX_RELEASE_VERSION} 1
+    ${If} $1 == "v"
+      StrCpy $1 ${RAUX_RELEASE_VERSION} "" 1  ; Get substring starting from position 1 (skipping 'v')
+      StrCpy $RauxReleaseURL "${RAUX_RELEASE_BASE_URL}/raux-$1-setup.zip"
+    ${Else}
+      StrCpy $RauxReleaseURL "${RAUX_RELEASE_BASE_URL}/raux-${RAUX_RELEASE_VERSION}-setup.zip"
     ${EndIf}
-    Quit
+    
+    ; Download the asset file
+    Push "Downloading RAUX release ${RAUX_RELEASE_VERSION}"
+    Call LogMessage
+    Push "URL: $RauxReleaseURL"
+    Call LogMessage
+    
+    ExecWait 'curl -L -o "$TEMP\raux-release.zip" "$RauxReleaseURL"' $0
+    
+    ${If} $0 != 0
+      Push "ERROR: Failed to download release"
+      Call LogMessage
+      ${IfNot} ${Silent}
+        MessageBox MB_OK "Failed to download release from GitHub. Please check your internet connection and try again."
+      ${EndIf}
+      Quit
+    ${EndIf}
   ${EndIf}
   
+  extract_release:
   ; Extract the downloaded release
   Push "Extracting release..."
   Call LogMessage

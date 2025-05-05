@@ -15,7 +15,7 @@ PYTHON_VERSION = "3.11.8"  # Specific version for consistency
 PYTHON_DIR = "python"  # Directory name for standalone Python
 
 
-def install_raux(install_dir, debug=False, log_file=None, version=None):
+def install_raux(install_dir, debug=False, log_file=None, version=None, local_release=None):
     """
     Install RAUX (Windows-only).
 
@@ -24,6 +24,7 @@ def install_raux(install_dir, debug=False, log_file=None, version=None):
         debug (bool): Enable debug logging
         log_file (str): Custom log file path
         version (str): Specific version to install (e.g., "v0.6.5+raux.0.1.0.ab30cdb")
+        local_release (str): Path to a local release file to use instead of downloading
 
     Returns:
         int: Exit code (0 for success, non-zero for failure)
@@ -121,41 +122,60 @@ def install_raux(install_dir, debug=False, log_file=None, version=None):
 
         # Get the URL based on version parameter or latest release
         logging.info("Determining download URL...")
-        if version:
-            # Use specific version instead of fetching latest
-            download_url = get_specific_version_url(version)
-        else:
-            # Fallback to latest release if no version specified
-            download_url = get_latest_release_url()
-            
-        logging.info(f"Using download URL: {download_url}")
-
-        # Download the zip file
-        logging.info(f"Downloading from {download_url}")
-
-        try:
-            # Install requests if not already installed
+        
+        if local_release:
+            logging.info(f"Using local release file: {local_release}")
+            logging.info(f"Local file exists check: {os.path.exists(local_release)}")
+            logging.info(f"Local file absolute path: {os.path.abspath(local_release)}")
+            # Skip download entirely and just copy the local file
             try:
-                subprocess.run(
-                    ["python", "-m", "pip", "install", "requests"],
-                    check=True,
-                    capture_output=True,
-                )
-                logging.info("Installed requests package")
+                if not os.path.exists(local_release):
+                    logging.error(f"ERROR: Local release file does not exist: {local_release}")
+                    raise ValueError(f"Local release file does not exist: {local_release}")
+                
+                shutil.copy2(local_release, "raux.zip")
+                logging.info(f"Copied local release file to raux.zip")
+                logging.info(f"Destination file exists: {os.path.exists('raux.zip')}")
+                logging.info(f"Destination file size: {os.path.getsize('raux.zip')} bytes")
             except Exception as e:
-                logging.error(f"ERROR: Failed to install requests package: {str(e)}")
-                raise ValueError(f"Failed to install requests package: {str(e)}")
+                logging.error(f"ERROR: Failed to copy local release file: {str(e)}")
+                raise ValueError(f"Failed to copy local release file: {str(e)}")
+        else:
+            if version:
+                # Use specific version instead of fetching latest
+                download_url = get_specific_version_url(version)
+            else:
+                # Fallback to latest release if no version specified
+                download_url = get_latest_release_url()
+                
+            logging.info(f"Using download URL: {download_url}")
 
-            response = requests.get(download_url, stream=True, timeout=60)
-            response.raise_for_status()
+            # Download the zip file
+            logging.info(f"Downloading from {download_url}")
 
-            with open("raux.zip", "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
+            try:
+                # Install requests if not already installed
+                try:
+                    subprocess.run(
+                        ["python", "-m", "pip", "install", "requests"],
+                        check=True,
+                        capture_output=True,
+                    )
+                    logging.info("Installed requests package")
+                except Exception as e:
+                    logging.error(f"ERROR: Failed to install requests package: {str(e)}")
+                    raise ValueError(f"Failed to install requests package: {str(e)}")
 
-        except Exception as e:
-            logging.error(f"ERROR: Failed to download RAUX zip file: {str(e)}")
-            raise ValueError(f"Failed to download RAUX zip file: {str(e)}")
+                response = requests.get(download_url, stream=True, timeout=60)
+                response.raise_for_status()
+
+                with open("raux.zip", "wb") as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+            except Exception as e:
+                logging.error(f"ERROR: Failed to download RAUX zip file: {str(e)}")
+                raise ValueError(f"Failed to download RAUX zip file: {str(e)}")
 
         # Check if zip file exists
         if not os.path.exists("raux.zip"):
@@ -468,6 +488,14 @@ def get_specific_version_url(version):
 
 
 if __name__ == "__main__":
+    # Add debug logging for command line arguments
+    print("\n========== DEBUG: COMMAND LINE ARGUMENTS ==========")
+    print(f"Script path: {sys.argv[0]}")
+    print("Arguments received:")
+    for i, arg in enumerate(sys.argv[1:], 1):
+        print(f"  Arg {i}: {arg}")
+    print("==================================================\n")
+    
     # If run directly, parse command line arguments
     import argparse
 
@@ -476,8 +504,14 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--log-file", help="Custom log file path")
     parser.add_argument("--version", help="Specific version to install")
+    parser.add_argument("--local-release", help="Path to a local release file to use instead of downloading")
 
     args = parser.parse_args()
+    
+    # Log the parsed arguments as well
+    if args.local_release:
+        print(f"DEBUG: Local release path after parsing: {args.local_release}")
+        print(f"DEBUG: Local release path exists: {os.path.exists(args.local_release)}")
 
-    exit_code = install_raux(args.install_dir, args.debug, args.log_file, args.version)
+    exit_code = install_raux(args.install_dir, args.debug, args.log_file, args.version, args.local_release)
     sys.exit(exit_code)

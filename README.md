@@ -84,8 +84,10 @@ If you're interested in contributing to RAUX or need to test installer changes, 
 
 - Making changes to installer components
 - Testing installer changes without creating releases
-- Using local artifacts for testing
+- Using local artifacts for testing (with `/LOCAL_RELEASE` parameter)
 - Common troubleshooting steps
+
+The installer now supports a `/LOCAL_RELEASE` parameter that completely bypasses GitHub downloads, allowing you to test with local artifacts even in offline environments or when working with unreleased changes.
 
 For installer development, we now use a standalone Python 3.11 installation instead of conda, making it more consistent with GAIA's approach.
 
