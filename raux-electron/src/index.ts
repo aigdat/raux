@@ -5,12 +5,23 @@ import { app, BrowserWindow } from 'electron';
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
+import { rauxProcessManager } from './rauxProcessManager';
+import { setTimeout } from 'timers';
+import { isDev } from './envUtils';
+import { existsSync, unlinkSync } from 'fs';
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+const RAUX_URL = 'http://localhost:8080';
+
 const createWindow = (): void => {
+  // Remove raux.log if it exists
+  const logPath = require('path').join(require('./envUtils').getInstallDir(), 'raux.log');
+  if (existsSync(logPath)) unlinkSync(logPath);
+
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     height: 600,
@@ -20,11 +31,32 @@ const createWindow = (): void => {
     },
   });
 
-  // and load the index.html of the app.
-  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  // Show a simple loading page only in production
+  if (!isDev) {
+    mainWindow.loadFile('index.html');
+  }
+
+  // Start RAUX backend
+  rauxProcessManager.startRaux();
+
+  // Poll for backend readiness
+  const pollBackend = () => {
+    fetch(RAUX_URL)
+      .then(() => {
+        mainWindow.loadURL(RAUX_URL);
+      })
+      .catch(() => {
+        if (rauxProcessManager.getStatus() === 'crashed') {
+          mainWindow.loadURL('data:text/html,<h1>RAUX failed to start</h1>');
+        } else {
+          setTimeout(pollBackend, 1000);
+        }
+      });
+  };
+  pollBackend();
 
   // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools(); // Uncomment for debugging
 };
 
 // This method will be called when Electron has finished

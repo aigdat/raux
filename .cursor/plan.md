@@ -175,48 +175,41 @@ This section outlines the specific implementation steps for integrating RAUX int
    - [x] Handle secret key generation/management (done in process manager)
    - [x] Configure PORT and HOST settings (done in process manager)
    - [x] Set up Playwright if needed (done in process manager)
-   - [ ] Prepare Ollama integration if USE_OLLAMA_DOCKER is enabled
    - [x] Use bundled Python 3.11 to execute the uvicorn instance (done in process manager)
    - [x] Ensure Node.js correctly passes environment variables to Python process (done in process manager)
 
    **Note:** Most of Step 3 is already covered by the process manager. Only Ollama integration remains for future work.
 
 4. **Process Communication**
-   - [ ] Implement stdout/stderr capture from RAUX process
-   - [ ] Create logging mechanism for RAUX output
-   - [ ] Build status monitoring system
+   - [x] Implement stdout/stderr capture from RAUX process
+   - [x] Create logging mechanism for RAUX output
+   - [x] Build status monitoring system
 
-### Phase 2: UI Integration & Network Features
+### Phase 2: UI Integration & IPC Features
 
 5. **Electron Window Configuration**
    - [ ] Create main application window pointing to RAUX URL
    - [ ] Implement loading states while RAUX is starting
    - [ ] Add error handling for connection failures
 
-6. **Reverse Proxy Setup**
-   - [ ] Implement lightweight proxy server using Node.js/Express
-   - [ ] Configure network discovery to expose RAUX on local network
-   - [ ] Add security measures for network access
-   - [ ] Create local network URL display in UI
-
-7. **IPC Implementation**
+6. **IPC Implementation**
    - [ ] Create IPC channels for communication between main and renderer processes
    - [ ] Build control panel for RAUX process management
    - [ ] Implement restart/stop functionality
 
 ### Phase 3: User Experience & Packaging
 
-8. **Application Lifecycle Management**
+7. **Application Lifecycle Management**
    - [ ] Implement proper startup sequence
    - [ ] Handle graceful shutdown of RAUX when Electron closes
    - [ ] Add auto-restart options for unexpected RAUX crashes
 
-9. **Configuration UI**
+8. **Configuration UI**
    - [ ] Create settings panel for RAUX configuration
    - [ ] Make environment variables configurable through UI
    - [ ] Save/load configuration options
 
-10. **Electron Packaging**
+9. **Electron Packaging**
     - [ ] Configure Electron Forge for application packaging
     - [ ] Include all RAUX dependencies in the package
     - [ ] Set up Python bundling strategy for Windows
@@ -225,10 +218,22 @@ This section outlines the specific implementation steps for integrating RAUX int
     - [ ] Create testing suite for verifying installation and startup
     - [ ] Configure one-click startup with all services properly initialized
 
-11. **Auto-Update Implementation**
+10. **Auto-Update Implementation**
     - [ ] Set up update server connection
     - [ ] Implement update checking mechanism
     - [ ] Add update notification and installation process
+
+---
+
+### Final Phase: Reverse Proxy Setup (Network Features)
+
+11. **Reverse Proxy Setup**
+    - [ ] Implement lightweight proxy server using Node.js/Express
+    - [ ] Configure network discovery to expose RAUX on local network
+    - [ ] Add security measures for network access
+    - [ ] Create local network URL display in UI
+
+**Note:** The reverse proxy will be implemented after the core RAUX pipeline, UI, and IPC features are complete, to ensure a stable local experience before adding network exposure.
 
 ### Implementation Notes
 - Focus on Windows platform first, following the installation flow in the existing plan

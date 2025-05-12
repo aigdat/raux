@@ -1,30 +1,21 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
-import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, copyFileSync, readFileSync, writeFileSync, appendFileSync, openSync } from 'fs';
 import { join } from 'path';
-import { app } from 'electron';
-
-// Configurable install path (should be set at install time or loaded from config)
-const getInstallDir = (): string => {
-  // Example: use Electron's userData or a config file
-  // Replace with actual logic as needed
-  // e.g., return app.getPath('userData');
-  // For now, assume a fixed path for demonstration:
-  return join(app.getPath('userData'), 'RAUX');
-};
-
-const PYTHON_RELATIVE_PATH = join('python', process.platform === 'win32' ? 'python.exe' : 'bin/python3');
-const BACKEND_RELATIVE_PATH = 'backend';
+import { isDev, getInstallDir, getBackendDir, getPythonPath } from './envUtils';
 
 class RauxProcessManager {
   private rauxProcess: ChildProcessWithoutNullStreams | null = null;
   private installDir: string;
   private pythonPath: string;
   private backendDir: string;
+  private status: 'starting' | 'running' | 'stopped' | 'crashed' = 'stopped';
+  private logPath: string;
 
   constructor() {
     this.installDir = getInstallDir();
-    this.pythonPath = join(this.installDir, PYTHON_RELATIVE_PATH);
-    this.backendDir = join(this.installDir, BACKEND_RELATIVE_PATH);
+    this.pythonPath = getPythonPath();
+    this.backendDir = getBackendDir();
+    this.logPath = join(this.installDir, 'raux.log');
   }
 
   ensureEnvFile() {
@@ -37,6 +28,11 @@ class RauxProcessManager {
 
   ensureSecretKey(): string {
     const keyFile = join(this.backendDir, '.webui_secret_key');
+    const keyDir = this.backendDir;
+    if (!existsSync(keyDir)) {
+      // Ensure parent directory exists
+      require('fs').mkdirSync(keyDir, { recursive: true });
+    }
     if (!existsSync(keyFile)) {
       // Generate a random 12-byte base64 string
       const random = Buffer.from(Array.from({ length: 12 }, () => Math.floor(Math.random() * 256)));
@@ -107,22 +103,71 @@ class RauxProcessManager {
 
     await this.ensurePlaywrightInstalled(env);
 
-    // Start uvicorn
-    const args = [
-      '-m', 'uvicorn',
-      'open_webui.main:app',
-      '--host', env.HOST!,
-      '--port', env.PORT!,
-      '--forwarded-allow-ips', '*',
-      '--workers', env.UVICORN_WORKERS || '1',
-    ];
-    this.rauxProcess = spawn(this.pythonPath, args, {
-      cwd: this.backendDir,
-      env,
-      stdio: 'inherit',
+    // Ensure log file exists
+    if (!existsSync(this.logPath)) openSync(this.logPath, 'w');
+
+    // Windows dev mode: use start_windows.bat
+    if (isDev && process.platform === 'win32') {
+      const batPath = join(this.backendDir, 'start_windows.bat');
+      console.log('Spawning RAUX backend via start_windows.bat:');
+      console.log('  CWD:', this.backendDir);
+      this.rauxProcess = spawn('cmd.exe', ['/c', batPath], {
+        cwd: this.backendDir,
+        env,
+        stdio: 'pipe',
+        shell: false,
+      });
+    } else {
+      // Choose executable and args based on dev/prod
+      let executable: string;
+      let args: string[];
+      if (isDev) {
+        executable = 'uvicorn';
+        args = [
+          'open_webui.main:app',
+          '--host', env.HOST!,
+          '--port', env.PORT!,
+          '--forwarded-allow-ips', '*',
+          '--workers', env.UVICORN_WORKERS || '1',
+        ];
+      } else {
+        executable = this.pythonPath;
+        args = [
+          '-m', 'uvicorn',
+          'open_webui.main:app',
+          '--host', env.HOST!,
+          '--port', env.PORT!,
+          '--forwarded-allow-ips', '*',
+          '--workers', env.UVICORN_WORKERS || '1',
+        ];
+      }
+
+      // Debug output for process spawn
+      console.log('Spawning RAUX backend:');
+      console.log('  Executable:', executable);
+      console.log('  Args:', args);
+      console.log('  CWD:', this.backendDir);
+
+      this.rauxProcess = spawn(executable, args, {
+        cwd: this.backendDir,
+        env,
+        stdio: 'pipe',
+        shell: false,
+      });
+    }
+
+    this.rauxProcess.stdout.on('data', (data) => {
+      appendFileSync(this.logPath, data.toString());
+      if (this.status === 'starting') this.status = 'running';
     });
+
+    this.rauxProcess.stderr.on('data', (data) => {
+      appendFileSync(this.logPath, data.toString());
+    });
+
     this.rauxProcess.on('close', (code) => {
-      console.log(`RAUX process exited with code ${code}`);
+      this.status = code === 0 ? 'stopped' : 'crashed';
+      appendFileSync(this.logPath, `\nRAUX process exited with code ${code}\n`);
       this.rauxProcess = null;
     });
   }
@@ -132,6 +177,10 @@ class RauxProcessManager {
       this.rauxProcess.kill('SIGTERM');
       this.rauxProcess = null;
     }
+  }
+
+  getStatus() {
+    return this.status;
   }
 }
 
