@@ -188,7 +188,7 @@ This section outlines the specific implementation steps for integrating RAUX int
 ### Phase 2: UI Integration & IPC Features
 
 5. **Electron Window Configuration**
-   - [ ] Create main application window pointing to RAUX URL
+   - [x] Create main application window pointing to RAUX URL
    - [ ] Implement loading states while RAUX is starting
    - [ ] Add error handling for connection failures
 
@@ -213,8 +213,19 @@ This section outlines the specific implementation steps for integrating RAUX int
     - [ ] Configure Electron Forge for application packaging
     - [ ] Include all RAUX dependencies in the package
     - [ ] Set up Python bundling strategy for Windows
-    - [ ] Create installer configurations
-    - [ ] Implement RAUX build process with hatch integration
+
+    **Backend Integration Strategy (Updated)**
+    - [x] Explicitly list all backend files and folders needed for runtime in Electron Forge's extraResource array (e.g., open_webui, requirements.txt, .env.example, .webui_secret_key, start scripts, and any static data/db files)
+    - [x] Use the old wheel build process as a reference for what to include, but do not build a wheel
+    - [x] Maintain the extraResource config directly in forge.config.js in source control; do not patch or generate it in CI
+    - [ ] Create first-run script to detect, download, and install portable Python 3.11
+    - [ ] Implement pip install for requirements.txt using portable Python
+    - [ ] Configure backend process launching from Electron using portable Python
+    
+    **Installer Strategy**
+    - [ ] Use Electron Forge's NSIS target to create Windows installer
+    - [ ] Configure desktop shortcuts and start menu entries
+    - [ ] Create installer branding (icons, descriptions)
     - [ ] Create testing suite for verifying installation and startup
     - [ ] Configure one-click startup with all services properly initialized
 

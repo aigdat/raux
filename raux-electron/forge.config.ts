@@ -14,6 +14,13 @@ import { rendererConfig } from './webpack.renderer.config';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    extraResource: [
+      '../backend/open_webui',
+      '../backend/requirements.txt',
+      '../backend/start.sh',
+      '../backend/start_windows.bat',
+      '../backend/.env'
+    ],
   },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],

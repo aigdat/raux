@@ -9,6 +9,7 @@ import { rauxProcessManager } from './rauxProcessManager';
 import { setTimeout } from 'timers';
 import { isDev } from './envUtils';
 import { existsSync, unlinkSync } from 'fs';
+import { ensurePythonAndPipInstalled } from './pythonSetup';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -17,10 +18,12 @@ if (require('electron-squirrel-startup')) {
 
 const RAUX_URL = 'http://localhost:8080';
 
-const createWindow = (): void => {
+const createWindow = async (): Promise<void> => {
   // Remove raux.log if it exists
   const logPath = require('path').join(require('./envUtils').getInstallDir(), 'raux.log');
   if (existsSync(logPath)) unlinkSync(logPath);
+
+  await ensurePythonAndPipInstalled();
 
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -83,3 +86,9 @@ app.on('activate', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+
+async function main() {
+  await createWindow();
+}
+
+main();

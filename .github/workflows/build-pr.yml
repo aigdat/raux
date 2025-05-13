@@ -81,6 +81,18 @@ jobs:
             exit 1
           fi
 
+      - name: Check unzipper is in dependencies
+        run: |
+          if ! grep -q '"unzipper"' package.json; then
+            echo "ERROR: unzipper is not listed in dependencies in package.json!"
+            exit 1
+          fi
+          if jq -e '.devDependencies.unzipper' package.json > /dev/null; then
+            echo "ERROR: unzipper is in devDependencies, but must be in dependencies!"
+            exit 1
+          fi
+          echo "unzipper is correctly listed in dependencies."
+
   publish-installer:
     needs: build-and-package
     runs-on: windows-latest
