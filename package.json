@@ -1,6 +1,6 @@
 {
 	"name": "raux",
-	"version": "0.6.5+raux.0.1.1",
+	"version": "0.6.5+raux.0.2.0",
 	"openWebUIVersion": "0.6.5",
 	"private": true,
 	"scripts": {

@@ -3,7 +3,7 @@ import { join } from 'path';
 import { getInstallDir, getBackendDir } from './envUtils';
 import * as os from 'os';
 import * as https from 'https';
-import * as unzipper from 'unzipper';
+import extract from 'extract-zip';
 import { spawn } from 'child_process';
 
 const PYTHON_VERSION = '3.11.8';
@@ -44,14 +44,7 @@ export async function ensurePythonAndPipInstalled() {
       });
     }).on('error', reject);
   });
-  await new Promise<void>((resolve, reject) => {
-    createReadStream(zipPath)
-      .pipe(unzipper.Extract({ path: PYTHON_DIR }))
-      .on('close', resolve)
-      .on('error', reject);
-  });
-  // Optionally, remove the zip file after extraction
-  // fs.unlinkSync(zipPath);
+  await extract(zipPath, { dir: PYTHON_DIR });
 
   // Run ensurepip
   await new Promise<void>((resolve, reject) => {

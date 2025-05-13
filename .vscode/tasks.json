@@ -60,6 +60,20 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "RAUX Pre-Build Setup",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"./raux-electron/install/pre-build.ps1",
+				"-CopyEnv"
+			],
+			"presentation": {
+				"reveal": "always",
+				"panel": "new"
+			},
+			"problemMatcher": []
+		},
+		{
 			"label": "start-frontend",
 			"type": "npm",
 			"script": "dev",
