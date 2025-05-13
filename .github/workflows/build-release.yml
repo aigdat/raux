@@ -83,30 +83,6 @@ jobs:
           $packageJson | ConvertTo-Json -Depth 100 | Set-Content -Path package.json
           echo "Updated package.json version to ${{ needs.extract-version.outputs.version }}"
 
-      - name: Configure Electron Forge
-        run: |
-          cd raux-electron
-          
-          # Ensure the extraResources configuration is set to include backend files
-          $forgeConfig = Get-Content -Path forge.config.js -Raw
-          
-          # Check if extraResources is already configured
-          if ($forgeConfig -match "extraResources") {
-            echo "extraResources already configured in forge.config.js"
-          } else {
-            # Add extraResources configuration
-            $newConfig = $forgeConfig -replace "module\.exports\s*=\s*{", @"
-module.exports = {
-  packagerConfig: {
-    extraResource: [
-      '../backend',
-    ],
-  },
-"@
-            Set-Content -Path forge.config.js -Value $newConfig
-            echo "Updated forge.config.js with extraResources configuration"
-          }
-
       - name: Build Electron app
         run: |
           cd raux-electron
