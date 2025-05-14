@@ -16,7 +16,7 @@ export function getAppInstallDir() {
     return join(localAppData, 'raux');
   }
   // On other OS, fallback to appData/raux
-  return join(app.getPath('appData'), 'raux-setup');
+  return join(app.getPath('appData'), 'raux');
 }
 
 // Directory for user data (settings, logs, etc.)

@@ -100,6 +100,7 @@ class RauxProcessManager {
   async startRaux(envOverrides: Record<string, string> = {}) {
     try {
       logInfo('[RauxProcessManager] Starting RAUX backend...');
+      
       this.ensureEnvFile();
       
       const secretKey = this.ensureSecretKey();
@@ -186,7 +187,11 @@ class RauxProcessManager {
 
   stopRaux() {
     if (this.rauxProcess) {
-      this.rauxProcess.kill('SIGTERM');
+      try {
+        this.rauxProcess.kill('SIGTERM');
+      } catch (e) {
+        // Ignore errors
+      }
       this.rauxProcess = null;
     }
   }
@@ -196,4 +201,4 @@ class RauxProcessManager {
   }
 }
 
-export const rauxProcessManager = new RauxProcessManager(); 
+export const rauxProcessManager = new RauxProcessManager();
