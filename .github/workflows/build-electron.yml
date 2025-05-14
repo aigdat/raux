@@ -112,6 +112,10 @@ jobs:
           set RAUX_PROD_VERSION=${{ needs.extract-version.outputs.production_version }}
           npm run make
 
+      - name: List output directory
+        run: |
+          ls -l raux-electron/out/make/squirrel.windows/x64/
+
       - name: Create SHA256 checksum
         run: |
           $VERSION = "${{ needs.extract-version.outputs.production_version }}"
