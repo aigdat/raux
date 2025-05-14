@@ -34,10 +34,8 @@ const createWindow = async (): Promise<void> => {
     },
   });
 
-  // Show a simple loading page only in production
-  if (!isDev) {
-    mainWindow.loadFile('index.html');
-  }
+  // Always load the Webpack entry point, regardless of dev or prod
+  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 
   // Start RAUX backend
   rauxProcessManager.startRaux();
