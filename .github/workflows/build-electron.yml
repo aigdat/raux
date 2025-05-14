@@ -106,6 +106,12 @@ jobs:
           cd raux-electron
           npm ci
 
+      - name: Set sanitized production version
+        id: sanitize-version
+        run: |
+          $SANITIZED_VERSION = "${{ needs.extract-version.outputs.production_version }}".Replace('+', '_')
+          echo "sanitized_version=$SANITIZED_VERSION" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
       - name: Build Electron app (Windows)
         run: |
           cd raux-electron
@@ -118,8 +124,7 @@ jobs:
 
       - name: Create SHA256 checksum
         run: |
-          $VERSION = "${{ needs.extract-version.outputs.production_version }}"
-          $INSTALLER_PATH = "raux-electron/out/make/squirrel.windows/x64/raux-installer-$VERSION.exe"
+          $INSTALLER_PATH = "raux-electron/out/make/squirrel.windows/x64/raux-setup.exe"
           $CHECKSUM = (Get-FileHash -Path $INSTALLER_PATH -Algorithm SHA256).Hash.ToLower()
           $CHECKSUM | Out-File -FilePath "$INSTALLER_PATH.sha256" -Encoding ascii
           echo "Created checksum for installer: $CHECKSUM"
@@ -129,6 +134,6 @@ jobs:
         with:
           name: build-artifacts
           path: |
-            raux-electron/out/make/squirrel.windows/x64/raux-installer-${{ needs.extract-version.outputs.production_version }}.exe
-            raux-electron/out/make/squirrel.windows/x64/raux-installer-${{ needs.extract-version.outputs.production_version }}.exe.sha256
+            raux-electron/out/make/squirrel.windows/x64/raux-setup.exe
+            raux-electron/out/make/squirrel.windows/x64/raux-setup.exe.sha256
           retention-days: 7
