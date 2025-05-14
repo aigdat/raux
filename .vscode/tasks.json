@@ -2,32 +2,6 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Build RAUX Installer",
-			"type": "shell",
-			"command": "makensis",
-			"args": [
-				"${workspaceFolder}/installer/Installer-UX.nsi"
-			],
-			"group": "build",
-			"presentation": {
-				"reveal": "always",
-				"panel": "new"
-			},
-			"problemMatcher": []
-		},
-        {
-            "label": "Run RAUX Installer",
-            "type": "shell",
-            "command": "${workspaceFolder}\\installer\\Installer-UX.exe",
-            "dependsOn": ["Build RAUX Installer"],
-            "group": "build",
-            "presentation": {
-                "reveal": "always",
-                "panel": "new"
-            },
-            "problemMatcher": []
-        },
-		{
 			"label": "Clean RAUX Environment: AppData",
 			"type": "shell",
 			"command": "cmd",
@@ -56,20 +30,6 @@
 				"reveal": "always",
 				"panel": "new",
 				"close": true
-			},
-			"problemMatcher": []
-		},
-		{
-			"label": "RAUX Pre-Build Setup",
-			"type": "shell",
-			"command": "pwsh",
-			"args": [
-				"./raux-electron/install/pre-build.ps1",
-				"-CopyEnv"
-			],
-			"presentation": {
-				"reveal": "always",
-				"panel": "new"
 			},
 			"problemMatcher": []
 		},
@@ -105,8 +65,8 @@
 				},
 				"background": {
 					"activeOnStart": true,
-					"beginsPattern": "INFO:     Uvicorn running on",
-					"endsPattern": "INFO:     Application startup complete"
+					"beginsPattern": "INFO: Uvicorn running on",
+					"endsPattern": "INFO: Application startup complete"
 				}
 			},
 			"presentation": {
@@ -135,19 +95,19 @@
 		{
 			"label": "Build Electron Windows Installer",
 			"type": "shell",
-			"group": "build",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy", "Bypass",
+				"-File", "${workspaceFolder}/local-dev-build.ps1"
+			],
 			"presentation": {
 				"reveal": "always",
-				"panel": "new"
+				"panel": "new",
+				"close": true
 			},
-			"problemMatcher": [],
-			"windows": {
-				"command": "cmd",
-				"args": [
-					"/c",
-					"cd raux-electron && for /f %i in ('node -p \"require(\\\"../package.json\\\").version\"') do set RAUX_PROD_VERSION=%i && npm run make"
-				]
-			}
+			"group": "build",
+			"problemMatcher": []
 		}
 	],
 	"inputs": [

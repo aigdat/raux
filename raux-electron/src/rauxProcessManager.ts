@@ -2,6 +2,7 @@ import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { existsSync, copyFileSync, readFileSync, writeFileSync, appendFileSync, openSync } from 'fs';
 import { join } from 'path';
 import { isDev, getInstallDir, getBackendDir, getPythonPath } from './envUtils';
+import { logInfo, logError } from './logger';
 
 class RauxProcessManager {
   private rauxProcess: ChildProcessWithoutNullStreams | null = null;
@@ -16,6 +17,10 @@ class RauxProcessManager {
     this.pythonPath = getPythonPath();
     this.backendDir = getBackendDir();
     this.logPath = join(this.installDir, 'raux.log');
+    logInfo(`[RauxProcessManager] installDir: ${this.installDir}`);
+    logInfo(`[RauxProcessManager] pythonPath: ${this.pythonPath}`);
+    logInfo(`[RauxProcessManager] backendDir: ${this.backendDir}`);
+    logInfo(`[RauxProcessManager] logPath: ${this.logPath}`);
   }
 
   ensureEnvFile() {
@@ -88,88 +93,90 @@ class RauxProcessManager {
   }
 
   async startRaux(envOverrides: Record<string, string> = {}) {
-    this.ensureEnvFile();
-    const secretKey = this.ensureSecretKey();
-    await this.ensureRequirementsInstalled();
-
-    // Set up environment variables
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      PORT: envOverrides.PORT || '8080',
-      HOST: envOverrides.HOST || '0.0.0.0',
-      WEBUI_SECRET_KEY: secretKey,
-      ...envOverrides,
-    };
-
-    await this.ensurePlaywrightInstalled(env);
-
-    // Ensure log file exists
-    if (!existsSync(this.logPath)) openSync(this.logPath, 'w');
-
-    // Windows dev mode: use start_windows.bat
-    if (isDev && process.platform === 'win32') {
-      const batPath = join(this.backendDir, 'start_windows.bat');
-      console.log('Spawning RAUX backend via start_windows.bat:');
-      console.log('  CWD:', this.backendDir);
-      this.rauxProcess = spawn('cmd.exe', ['/c', batPath], {
-        cwd: this.backendDir,
-        env,
-        stdio: 'pipe',
-        shell: false,
-      });
-    } else {
-      // Choose executable and args based on dev/prod
-      let executable: string;
-      let args: string[];
-      if (isDev) {
-        executable = 'uvicorn';
-        args = [
-          'open_webui.main:app',
-          '--host', env.HOST!,
-          '--port', env.PORT!,
-          '--forwarded-allow-ips', '*',
-          '--workers', env.UVICORN_WORKERS || '1',
-        ];
+    try {
+      logInfo('[RauxProcessManager] Starting RAUX backend...');
+      this.ensureEnvFile();
+      logInfo('[RauxProcessManager] Ensured .env file');
+      const secretKey = this.ensureSecretKey();
+      logInfo('[RauxProcessManager] Ensured secret key');
+      await this.ensureRequirementsInstalled();
+      logInfo('[RauxProcessManager] Ensured requirements installed');
+      // Set up environment variables
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        PORT: envOverrides.PORT || '8080',
+        HOST: envOverrides.HOST || '0.0.0.0',
+        WEBUI_SECRET_KEY: secretKey,
+        ...envOverrides,
+      };
+      await this.ensurePlaywrightInstalled(env);
+      logInfo('[RauxProcessManager] Ensured Playwright installed');
+      // Ensure log file exists
+      if (!existsSync(this.logPath)) openSync(this.logPath, 'w');
+      // Windows dev mode: use start_windows.bat
+      if (isDev && process.platform === 'win32') {
+        const batPath = join(this.backendDir, 'start_windows.bat');
+        logInfo(`[RauxProcessManager] Spawning RAUX backend via start_windows.bat: ${batPath}`);
+        logInfo(`[RauxProcessManager] CWD: ${this.backendDir}`);
+        this.rauxProcess = spawn('cmd.exe', ['/c', batPath], {
+          cwd: this.backendDir,
+          env,
+          stdio: 'pipe',
+          shell: false,
+        });
       } else {
-        executable = this.pythonPath;
-        args = [
-          '-m', 'uvicorn',
-          'open_webui.main:app',
-          '--host', env.HOST!,
-          '--port', env.PORT!,
-          '--forwarded-allow-ips', '*',
-          '--workers', env.UVICORN_WORKERS || '1',
-        ];
+        // Choose executable and args based on dev/prod
+        let executable: string;
+        let args: string[];
+        if (isDev) {
+          executable = 'uvicorn';
+          args = [
+            'open_webui.main:app',
+            '--host', env.HOST!,
+            '--port', env.PORT!,
+            '--forwarded-allow-ips', '*',
+            '--workers', env.UVICORN_WORKERS || '1',
+          ];
+        } else {
+          executable = this.pythonPath;
+          args = [
+            '-m', 'uvicorn',
+            'open_webui.main:app',
+            '--host', env.HOST!,
+            '--port', env.PORT!,
+            '--forwarded-allow-ips', '*',
+            '--workers', env.UVICORN_WORKERS || '1',
+          ];
+        }
+        logInfo(`[RauxProcessManager] Spawning RAUX backend:`);
+        logInfo(`[RauxProcessManager]   Executable: ${executable}`);
+        logInfo(`[RauxProcessManager]   Args: ${JSON.stringify(args)}`);
+        logInfo(`[RauxProcessManager]   CWD: ${this.backendDir}`);
+        this.rauxProcess = spawn(executable, args, {
+          cwd: this.backendDir,
+          env,
+          stdio: 'pipe',
+          shell: false,
+        });
       }
-
-      // Debug output for process spawn
-      console.log('Spawning RAUX backend:');
-      console.log('  Executable:', executable);
-      console.log('  Args:', args);
-      console.log('  CWD:', this.backendDir);
-
-      this.rauxProcess = spawn(executable, args, {
-        cwd: this.backendDir,
-        env,
-        stdio: 'pipe',
-        shell: false,
+      this.rauxProcess.stdout.on('data', (data) => {
+        appendFileSync(this.logPath, data.toString());
+        if (this.status === 'starting') this.status = 'running';
       });
+      this.rauxProcess.stderr.on('data', (data) => {
+        appendFileSync(this.logPath, data.toString());
+        logError(`[RauxProcessManager][stderr] ${data.toString()}`);
+      });
+      this.rauxProcess.on('close', (code) => {
+        this.status = code === 0 ? 'stopped' : 'crashed';
+        appendFileSync(this.logPath, `\nRAUX process exited with code ${code}\n`);
+        logError(`[RauxProcessManager] RAUX process exited with code ${code}`);
+        this.rauxProcess = null;
+      });
+    } catch (err) {
+      logError(`[RauxProcessManager] Error starting RAUX: ${err && err.toString ? err.toString() : String(err)}`);
+      throw err;
     }
-
-    this.rauxProcess.stdout.on('data', (data) => {
-      appendFileSync(this.logPath, data.toString());
-      if (this.status === 'starting') this.status = 'running';
-    });
-
-    this.rauxProcess.stderr.on('data', (data) => {
-      appendFileSync(this.logPath, data.toString());
-    });
-
-    this.rauxProcess.on('close', (code) => {
-      this.status = code === 0 ? 'stopped' : 'crashed';
-      appendFileSync(this.logPath, `\nRAUX process exited with code ${code}\n`);
-      this.rauxProcess = null;
-    });
   }
 
   stopRaux() {
