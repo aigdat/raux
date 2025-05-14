@@ -29,7 +29,8 @@ const config: ForgeConfig = {
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
-      exe: exeName,
+      name: 'raux-setup',
+      exe: 'raux-setup.exe',
     }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({}),
