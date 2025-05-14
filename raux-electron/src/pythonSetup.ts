@@ -1,13 +1,14 @@
 import { existsSync, mkdirSync, createWriteStream } from 'fs';
 import { join } from 'path';
-import { getInstallDir, getBackendDir } from './envUtils';
+import { getUserInstallDir, getBackendDir, getAppInstallDir } from './envUtils';
 import * as os from 'os';
 import * as https from 'https';
 import extract from 'extract-zip';
 import { spawn } from 'child_process';
+import { logInfo, logError } from './logger';
 
 const PYTHON_VERSION = '3.11.8';
-const PYTHON_DIR = join(getInstallDir(), 'python');
+const PYTHON_DIR = join(getAppInstallDir(), 'python');
 const PYTHON_EXE = join(PYTHON_DIR, 'python.exe');
 
 function getPythonDownloadUrl() {
@@ -44,14 +45,20 @@ export async function ensurePythonAndPipInstalled() {
       });
     }).on('error', reject);
   });
+  
   await extract(zipPath, { dir: PYTHON_DIR });
 
   // Run ensurepip
   await new Promise<void>((resolve, reject) => {
-    const proc = spawn(PYTHON_EXE, ['-m', 'ensurepip'], { stdio: 'inherit' });
+    const proc = spawn(PYTHON_EXE, ['-m', 'ensurepip'], { stdio: 'pipe' });
+    proc.stdout.on('data', (data) => logInfo(`[ensurepip][stdout] ${data}`));
+    proc.stderr.on('data', (data) => logError(`[ensurepip][stderr] ${data}`));
     proc.on('close', (code) => {
       if (code === 0) resolve();
-      else reject(new Error('ensurepip failed'));
+      else {
+        logError('ensurepip failed');
+        reject(new Error('ensurepip failed'));
+      }
     });
   });
 
@@ -59,11 +66,16 @@ export async function ensurePythonAndPipInstalled() {
   await new Promise<void>((resolve, reject) => {
     const proc = spawn(PYTHON_EXE, ['-m', 'pip', 'install', '-r', join(getBackendDir(), 'requirements.txt')], {
       cwd: getBackendDir(),
-      stdio: 'inherit',
+      stdio: 'pipe',
     });
+    proc.stdout.on('data', (data) => logInfo(`[pip-install][stdout] ${data}`));
+    proc.stderr.on('data', (data) => logError(`[pip-install][stderr] ${data}`));
     proc.on('close', (code) => {
       if (code === 0) resolve();
-      else reject(new Error('pip install failed'));
+      else {
+        logError('pip install failed');
+        reject(new Error('pip install failed'));
+      }
     });
   });
 } 

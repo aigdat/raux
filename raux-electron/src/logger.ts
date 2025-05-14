@@ -1,13 +1,15 @@
 import log from 'electron-log';
-import { getInstallDir } from './envUtils';
+import { getUserInstallDir } from './envUtils';
 import { join, dirname } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 
-const logPath = join(getInstallDir(), 'raux.log');
+const logPath = join(getUserInstallDir(), 'raux.log');
 const logDir = dirname(logPath);
+
 if (!existsSync(logDir)) {
   mkdirSync(logDir, { recursive: true });
 }
+
 console.log('RAUX log file path:', logPath);
 
 // Set log file location

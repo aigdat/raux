@@ -1,23 +1,25 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { existsSync, copyFileSync, readFileSync, writeFileSync, appendFileSync, openSync } from 'fs';
 import { join } from 'path';
-import { isDev, getInstallDir, getBackendDir, getPythonPath } from './envUtils';
+import { isDev, getAppInstallDir, getBackendDir, getPythonPath } from './envUtils';
 import { logInfo, logError } from './logger';
+import { ensurePythonAndPipInstalled } from './pythonSetup';
 
 class RauxProcessManager {
   private rauxProcess: ChildProcessWithoutNullStreams | null = null;
-  private installDir: string;
   private pythonPath: string;
   private backendDir: string;
   private status: 'starting' | 'running' | 'stopped' | 'crashed' = 'stopped';
   private logPath: string;
 
   constructor() {
-    this.installDir = getInstallDir();
+    const installDir = getAppInstallDir();
     this.pythonPath = getPythonPath();
     this.backendDir = getBackendDir();
-    this.logPath = join(this.installDir, 'raux.log');
-    logInfo(`[RauxProcessManager] installDir: ${this.installDir}`);
+
+    this.logPath = join(installDir, 'raux.log');
+    
+    logInfo(`[RauxProcessManager] installDir: ${installDir}`);
     logInfo(`[RauxProcessManager] pythonPath: ${this.pythonPath}`);
     logInfo(`[RauxProcessManager] backendDir: ${this.backendDir}`);
     logInfo(`[RauxProcessManager] logPath: ${this.logPath}`);
@@ -29,8 +31,11 @@ class RauxProcessManager {
     if (!existsSync(envPath) && existsSync(envExamplePath)) {
       copyFileSync(envExamplePath, envPath);
     }
+
+    logInfo('[RauxProcessManager] Ensured .env file');
   }
 
+  // TODO: remove this ... it should auto generate!
   ensureSecretKey(): string {
     const keyFile = join(this.backendDir, '.webui_secret_key');
     const keyDir = this.backendDir;
@@ -43,27 +48,17 @@ class RauxProcessManager {
       const random = Buffer.from(Array.from({ length: 12 }, () => Math.floor(Math.random() * 256)));
       writeFileSync(keyFile, random.toString('base64'));
     }
-    return readFileSync(keyFile, 'utf-8').trim();
-  }
+    
+    const result = readFileSync(keyFile, 'utf-8').trim();
 
-  async ensureRequirementsInstalled() {
-    // Check for a marker file to avoid reinstalling every time
-    const marker = join(this.backendDir, '.requirements_installed');
-    if (existsSync(marker)) return;
-    await new Promise<void>((resolve, reject) => {
-      const pip = spawn(this.pythonPath, ['-m', 'pip', 'install', '-r', 'requirements.txt'], {
-        cwd: this.backendDir,
-        stdio: 'inherit',
-      });
-      pip.on('close', (code) => {
-        if (code === 0) {
-          writeFileSync(marker, 'ok');
-          resolve();
-        } else {
-          reject(new Error('pip install failed'));
-        }
-      });
-    });
+    if (!result) {
+      logError('[RauxProcessManager] Secret key is empty');
+      throw new Error('Secret key is empty');
+    } else {
+      logInfo('[RauxProcessManager] Ensured key exists');
+    }
+
+    return result;
   }
 
   async ensurePlaywrightInstalled(env: NodeJS.ProcessEnv) {
@@ -71,22 +66,32 @@ class RauxProcessManager {
       await new Promise<void>((resolve, reject) => {
         const pw = spawn(this.pythonPath, ['-m', 'playwright', 'install', 'chromium'], {
           cwd: this.backendDir,
-          stdio: 'inherit',
+          stdio: 'pipe',
         });
+        pw.stdout.on('data', (data) => logInfo(`[playwright][stdout] ${data}`));
+        pw.stderr.on('data', (data) => logError(`[playwright][stderr] ${data}`));
         pw.on('close', (code) => {
           if (code === 0) resolve();
-          else reject(new Error('playwright install failed'));
+          else {
+            logError('playwright install failed');
+            reject(new Error('playwright install failed'));
+          }
         });
       });
       // Download NLTK data
       await new Promise<void>((resolve, reject) => {
         const nltk = spawn(this.pythonPath, ['-c', "import nltk; nltk.download('punkt_tab')"], {
           cwd: this.backendDir,
-          stdio: 'inherit',
+          stdio: 'pipe',
         });
+        nltk.stdout.on('data', (data) => logInfo(`[nltk][stdout] ${data}`));
+        nltk.stderr.on('data', (data) => logError(`[nltk][stderr] ${data}`));
         nltk.on('close', (code) => {
           if (code === 0) resolve();
-          else reject(new Error('nltk download failed'));
+          else {
+            logError('nltk download failed');
+            reject(new Error('nltk download failed'));
+          }
         });
       });
     }
@@ -96,11 +101,11 @@ class RauxProcessManager {
     try {
       logInfo('[RauxProcessManager] Starting RAUX backend...');
       this.ensureEnvFile();
-      logInfo('[RauxProcessManager] Ensured .env file');
+      
       const secretKey = this.ensureSecretKey();
-      logInfo('[RauxProcessManager] Ensured secret key');
-      await this.ensureRequirementsInstalled();
-      logInfo('[RauxProcessManager] Ensured requirements installed');
+
+      await ensurePythonAndPipInstalled();
+
       // Set up environment variables
       const env: NodeJS.ProcessEnv = {
         ...process.env,

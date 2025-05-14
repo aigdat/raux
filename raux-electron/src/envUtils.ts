@@ -1,27 +1,46 @@
 import { app } from 'electron';
 import { join } from 'path';
+import os from 'os';
 
 export const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === '1';
 
-export function getInstallDir() {
+// Directory for app binaries and dependencies (Python, open-webui)
+export function getAppInstallDir() {
   if (isDev) {
     // In dev, backend is at ../../backend relative to src
     return join(__dirname, '../../');
   }
-  return join(app.getPath('userData'), 'RAUX');
+  // On Windows, use LOCALAPPDATA env var for AppData\Local
+  if (process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA || join(os.homedir(), 'AppData', 'Local');
+    return join(localAppData, 'raux');
+  }
+  // On other OS, fallback to appData/raux
+  return join(app.getPath('appData'), 'raux-setup');
 }
 
+// Directory for user data (settings, logs, etc.)
+export function getUserInstallDir() {
+  if (isDev) {
+    return join(__dirname, '../../');
+  }
+  // In production, use Roaming/raux
+  return app.getPath('userData');
+}
+
+// Backend directory (open-webui)
 export function getBackendDir() {
   if (isDev) {
-    // In dev, backend is at ../../../backend relative to src
     return join(__dirname, '../../../backend');
   }
-  return join(getInstallDir(), 'backend');
+  // Use app install dir for backend
+  return join(getAppInstallDir(), 'backend');
 }
 
+// Python executable path
 export function getPythonPath() {
   if (isDev) {
     return 'python'; // Use system Python in dev
   }
-  return join(getInstallDir(), 'python', process.platform === 'win32' ? 'python.exe' : 'bin/python3');
+  return join(getAppInstallDir(), 'python', process.platform === 'win32' ? 'python.exe' : 'bin/python3');
 } 
