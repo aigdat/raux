@@ -106,16 +106,9 @@ jobs:
           cd raux-electron
           npm ci
 
-      - name: Set sanitized production version
-        id: sanitize-version
-        run: |
-          $SANITIZED_VERSION = "${{ needs.extract-version.outputs.production_version }}".Replace('+', '_')
-          echo "sanitized_version=$SANITIZED_VERSION" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
       - name: Build Electron app (Windows)
         run: |
           cd raux-electron
-          set RAUX_PROD_VERSION=${{ needs.extract-version.outputs.production_version }}
           npm run make
 
       - name: List output directory
