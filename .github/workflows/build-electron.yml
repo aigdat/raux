@@ -2,15 +2,6 @@ name: Build and Release Electron App
 
 on:
   workflow_dispatch:
-    inputs:
-      production-version:
-        description: 'Product version to release (e.g., 0.6.5+raux.0.1.1)'
-        required: true
-        default: ''
-      electron-version:
-        description: 'Electron version to release (e.g., 0.1.1)'
-        required: true
-        default: ''
 
 jobs:
   extract-version:
@@ -22,16 +13,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set production version
+      - name: Get production version from RAUX/package.json
         id: get-production-version
         run: |
-          VERSION="${{ github.event.inputs.production-version }}"
+          VERSION=$(jq -r .version package.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Set electron version
+      - name: Get electron version from RAUX/raux-electron/package.json
         id: get-electron-version
         run: |
-          VERSION="${{ github.event.inputs.electron-version }}"
+          VERSION=$(jq -r .version raux-electron/package.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   build-electron:
