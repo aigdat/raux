@@ -122,11 +122,16 @@ jobs:
           $CHECKSUM | Out-File -FilePath "$INSTALLER_PATH.sha256" -Encoding ascii
           echo "Created checksum for installer: $CHECKSUM"
 
-      - name: Upload build artifacts
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
-          path: |
-            raux-electron/out/make/squirrel.windows/x64/raux-setup.exe
-            raux-electron/out/make/squirrel.windows/x64/raux-setup.exe.sha256
+          name: raux-setup.exe
+          path: raux-electron/out/make/squirrel.windows/x64/raux-setup.exe
+          retention-days: 7
+
+      - name: Upload checksum artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: raux-setup.exe.sha256
+          path: raux-electron/out/make/squirrel.windows/x64/raux-setup.exe.sha256
           retention-days: 7
