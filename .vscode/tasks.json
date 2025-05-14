@@ -131,6 +131,23 @@
 			"type": "shell",
 			"command": "echo ${input:terminateFrontend}",
 			"problemMatcher": []
+		},
+		{
+			"label": "Build Electron Windows Installer",
+			"type": "shell",
+			"group": "build",
+			"presentation": {
+				"reveal": "always",
+				"panel": "new"
+			},
+			"problemMatcher": [],
+			"windows": {
+				"command": "cmd",
+				"args": [
+					"/c",
+					"cd raux-electron && for /f %i in ('node -p \"require(\\\"../package.json\\\").version\"') do set RAUX_PROD_VERSION=%i && npm run make"
+				]
+			}
 		}
 	],
 	"inputs": [
