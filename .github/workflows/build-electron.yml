@@ -111,6 +111,10 @@ jobs:
           cd raux-electron
           npm run make
 
+      - name: Rename installer to raux-setup.exe
+        run: |
+          mv raux-electron/out/make/squirrel.windows/x64/*.exe raux-electron/out/make/squirrel.windows/x64/raux-setup.exe
+  
       - name: List output directory
         run: |
           ls -l raux-electron/out/make/squirrel.windows/x64/
