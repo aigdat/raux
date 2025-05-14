@@ -99,7 +99,7 @@ jobs:
         with:
           name: build-context
 
-      - name: Setup RAU123123X Environment
+      - name: Setup RAUX Environment
         run: |
           cp raux.env backend\.env
 
@@ -118,55 +118,22 @@ jobs:
       - name: Build Electron app (Windows)
         run: |
           cd raux-electron
+          set RAUX_PROD_VERSION=${{ needs.extract-version.outputs.production_version }}
           npm run make
-
-      - name: Find generated files
-        id: find-files
-        run: |
-          $INSTALLER = Get-ChildItem -Path "raux-electron\out\make\squirrel.windows\x64\*.exe" -Recurse | Select-Object -First 1
-          if ($INSTALLER) {
-            echo "installer_path=$($INSTALLER.FullName)" >> $env:GITHUB_OUTPUT
-            echo "installer_name=$($INSTALLER.Name)" >> $env:GITHUB_OUTPUT
-            echo "Found installer: $($INSTALLER.FullName)"
-          } else {
-            echo "Error: No installer found!"
-            exit 1
-          }
-          $ZIP = Get-ChildItem -Path "raux-electron\out\make\zip\win32\x64\*.zip" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($ZIP) {
-            echo "zip_path=$($ZIP.FullName)" >> $env:GITHUB_OUTPUT
-            echo "zip_name=$($ZIP.Name)" >> $env:GITHUB_OUTPUT
-            echo "Found zip: $($ZIP.FullName)"
-          } else {
-            echo "No zip found, continuing without zip."
-          }
 
       - name: Create SHA256 checksum
         run: |
-          $INSTALLER_PATH = "${{ steps.find-files.outputs.installer_path }}"
+          $VERSION = "${{ needs.extract-version.outputs.production_version }}"
+          $INSTALLER_PATH = "raux-electron/out/make/squirrel.windows/x64/raux-installer-$VERSION.exe"
           $CHECKSUM = (Get-FileHash -Path $INSTALLER_PATH -Algorithm SHA256).Hash.ToLower()
           $CHECKSUM | Out-File -FilePath "$INSTALLER_PATH.sha256" -Encoding ascii
           echo "Created checksum for installer: $CHECKSUM"
 
-      - name: Create GitHub release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            ${{ steps.find-files.outputs.installer_path }}
-            ${{ steps.find-files.outputs.installer_path }}.sha256
-            ${{ steps.find-files.outputs.zip_path }}
-          tag_name: v${{ needs.extract-version.outputs.production_version }}
-          name: v${{ needs.extract-version.outputs.production_version }}
-          body: ${{ needs.build-electron.outputs.changelog_notes }}
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload additional build artifacts
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
-          path: raux-electron/out/
+          path: |
+            raux-electron/out/make/squirrel.windows/x64/raux-installer-${{ needs.extract-version.outputs.production_version }}.exe
+            raux-electron/out/make/squirrel.windows/x64/raux-installer-${{ needs.extract-version.outputs.production_version }}.exe.sha256
           retention-days: 7

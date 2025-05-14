@@ -11,6 +11,9 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { mainConfig } from './webpack.main.config';
 import { rendererConfig } from './webpack.renderer.config';
 
+const version = process.env.RAUX_PROD_VERSION || 'dev';
+const exeName = `raux-installer-${version}.exe`;
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
@@ -21,9 +24,17 @@ const config: ForgeConfig = {
       '../backend/start_windows.bat',
       '../backend/.env'
     ],
+    executableName: `raux-installer-${version}`,
   },
   rebuildConfig: {},
-  makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
+  makers: [
+    new MakerSquirrel({
+      exe: exeName,
+    }),
+    new MakerZIP({}, ['darwin']),
+    new MakerRpm({}),
+    new MakerDeb({})
+  ],
   plugins: [
     new AutoUnpackNativesPlugin({}),
     new WebpackPlugin({
