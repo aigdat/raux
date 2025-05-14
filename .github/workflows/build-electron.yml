@@ -115,10 +115,6 @@ jobs:
         run: |
           mv raux-electron/out/make/squirrel.windows/x64/*.exe raux-electron/out/make/squirrel.windows/x64/raux-setup.exe
   
-      - name: List output directory
-        run: |
-          ls -l raux-electron/out/make/squirrel.windows/x64/
-
       - name: Create SHA256 checksum
         run: |
           $INSTALLER_PATH = "raux-electron/out/make/squirrel.windows/x64/raux-setup.exe"
