@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, createWriteStream, rmSync } from 'fs';
 import { join } from 'path';
-import { getAppInstallDir, getBackendDir, getPythonPath } from './envUtils';
+import { getAppInstallDir, getPythonPath } from './envUtils';
 import * as os from 'os';
 import fetch from 'node-fetch';
 import extract from 'extract-zip';
@@ -228,6 +228,11 @@ async function installRAUXWheel(wheelPath: string): Promise<void> {
 
 export async function ensurePythonAndPipInstalled() {
   try {
+    // If PYTHON_DIR exists, assume setup is complete and skip installation
+    if (existsSync(PYTHON_DIR)) {
+      logInfo('Python directory already exists, skipping installation.');
+      return;
+    }
     // Remove PYTHON_DIR if it exists, then recreate it
     if (existsSync(PYTHON_DIR)) {
       rmSync(PYTHON_DIR, { recursive: true, force: true });

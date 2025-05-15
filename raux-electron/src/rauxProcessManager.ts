@@ -111,6 +111,7 @@ class RauxProcessManager {
         PORT: envOverrides.PORT || '8080',
         HOST: envOverrides.HOST || '0.0.0.0',
         WEBUI_SECRET_KEY: secretKey,
+        PYTHONIOENCODING: 'utf-8',
         ...envOverrides,
       };
       await this.ensurePlaywrightInstalled(env);
