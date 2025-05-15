@@ -75,8 +75,7 @@
 				"close": true
 			},
 			"group": "build",
-			"problemMatcher": [],
-			"dependsOn": ["Clean RAUX Environment: AppData"]
+			"problemMatcher": []
 		},
 		{
 			"label": "Clean RAUX Environment: AppData",
@@ -88,7 +87,8 @@
 			],
 			"presentation": {
 				"reveal": "silent",
-				"panel": "new"
+				"panel": "new",
+				"close": true
 			},
 			"problemMatcher": []
 		},

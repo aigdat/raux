@@ -214,14 +214,20 @@ This section outlines the specific implementation steps for integrating RAUX int
     - [ ] Include all RAUX dependencies in the package
     - [ ] Set up Python bundling strategy for Windows
 
-    **Backend Integration Strategy (Updated)**
-    - [x] Explicitly list all backend files and folders needed for runtime in Electron Forge's extraResource array (e.g., open_webui, requirements.txt, .env.example, .webui_secret_key, start scripts, and any static data/db files)
-    - [x] Use the old wheel build process as a reference for what to include, but do not build a wheel
-    - [x] Maintain the extraResource config directly in forge.config.js in source control; do not patch or generate it in CI
-    - [ ] Create first-run script to detect, download, and install portable Python 3.11
-    - [ ] Implement pip install for requirements.txt using portable Python
-    - [ ] Configure backend process launching from Electron using portable Python
+    **Backend Integration Strategy (Updated - Wheel Based Installation)**
+    - [x] Explicitly list essential backend files in Electron Forge's extraResource array (e.g., requirements.txt, .env.example, .webui_secret_key, start scripts)
+    - [ ] Update build-electron.yml workflow to build a wheel artifact during the CI process
+    - [ ] Update pythonSetup.ts to download the wheel artifact after setting up Python
+    - [ ] Implement pip install for the wheel using the downloaded portable Python
+    - [ ] Configure backend process launching from Electron using the wheel-installed components
     
+    **Wheel Installation Process**
+    - [ ] Build workflow produces a wheel artifact separate from the main Electron installer
+    - [ ] During first run, Electron downloads portable Python 3.11
+    - [ ] Then Electron downloads the RAUX wheel from CI artifact storage
+    - [ ] Electron executes pip install on the wheel file using the bundled Python
+    - [ ] Post-installation validation ensures all components are properly installed
+
     **Installer Strategy**
     - [ ] Use Electron Forge's NSIS target to create Windows installer
     - [ ] Configure desktop shortcuts and start menu entries
@@ -259,7 +265,49 @@ This section outlines the specific implementation steps for integrating RAUX int
 - Implement automated tests for installation and startup to ensure reliability
 - Handle .env configuration as part of the first-run setup
 
+## Wheel-Based Installation Implementation Details
+
+This section outlines the specific steps to implement the wheel-based installation approach for RAUX within the Electron application.
+
+### 1. CI Workflow Enhancements (build-electron.yml)
+
+- Rename "extract-version" job to "build-preparation" to better reflect its expanded responsibilities
+- Add wheel building step to the workflow using the following steps:
+  1. Install wheel building dependencies
+  2. Build the wheel file using setuptools
+  3. Upload the wheel as a separate artifact (not part of a release)
+
+### 2. Python Setup Enhancements (pythonSetup.ts)
+
+- After setting up Python and pip, add function to download the wheel from artifact storage
+- Implement wheel installation using the bundled Python:
+  ```typescript
+  async function downloadRAUXWheel(): Promise<string> {
+    // Download wheel from artifact storage
+    // Return the path to the downloaded wheel
+  }
+  
+  async function installRAUXWheel(wheelPath: string): Promise<void> {
+    // Install the wheel using pip
+    // pip install [wheel-path]
+  }
+  ```
+
+### 3. Integration Flow
+
+1. Electron app starts and runs pythonSetup.ts
+2. pythonSetup.ts:
+   - Downloads and extracts Python 3.11
+   - Ensures pip is installed
+   - Downloads RAUX wheel from artifact storage
+   - Installs RAUX wheel using pip
+   - Validates installation by checking for key executables/paths
+3. Electron main process starts RAUX using the installed components
+4. User can interact with RAUX through the Electron UI
+
+This approach follows the same pattern used in the NSIS installer, ensuring consistency across installation methods while taking advantage of Electron's capabilities.
+
 **Next Steps:**
-- Integrate the process manager into Electron's main process lifecycle (start RAUX on app launch, stop on shutdown).
-- Implement process communication: capture stdout/stderr, logging, and status monitoring for the RAUX process.
-- Then proceed to UI integration and network features as outlined in Phase 2.
+- Update build-electron.yml to add wheel building
+- Enhance pythonSetup.ts to handle wheel download and installation
+- Test the complete installation flow on Windows

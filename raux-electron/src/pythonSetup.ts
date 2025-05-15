@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, createWriteStream, rmSync } from 'fs';
 import { join } from 'path';
 import { getAppInstallDir, getBackendDir, getPythonPath } from './envUtils';
 import * as os from 'os';
-import * as https from 'https';
+import fetch from 'node-fetch';
 import extract from 'extract-zip';
 import { spawn } from 'child_process';
 import { logInfo, logError } from './logger';
@@ -25,25 +25,25 @@ function getPythonDownloadUrl() {
 async function downloadPython(url: string, zipPath: string) {
   logInfo('Downloading Python...');
   return new Promise<void>((resolve, reject) => {
-
-    const file = createWriteStream(zipPath);
-    https.get(url, (response) => {
-      if (response.statusCode !== 200) {
-        logError('Failed to download Python: ' + response.statusCode);
-        reject(new Error('Failed to download Python: ' + response.statusCode));
-        return;
-      }
-      response.pipe(file);
-      file.on('finish', () => {
-        file.close();
-        logInfo('Python download finished.');
-        resolve();
+    fetch(url)
+      .then(response => {
+        if (response.status !== 200) {
+          logError('Failed to download Python: ' + response.status);
+          reject(new Error('Failed to download Python: ' + response.status));
+          return;
+        }
+        const file = createWriteStream(zipPath);
+        response.body.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          logInfo('Python download finished.');
+          resolve();
+        });
+      })
+      .catch(err => {
+        logError(`Download error: ${err}`);
+        reject(err);
       });
-    }).on('error', (err) => {
-      logError(`Download error: ${err}`);
-      reject(err);
-    });
-
   });
 }
 
@@ -65,30 +65,34 @@ async function ensurePipInstalled() {
 
   // Download get-pip.py
   await new Promise<void>((resolve, reject) => {
-    const file = createWriteStream(getPipPath);
-    https.get(getPipUrl, (response) => {
-      if (response.statusCode !== 200) {
-        logError('Failed to download get-pip.py: ' + response.statusCode);
-        reject(new Error('Failed to download get-pip.py: ' + response.statusCode));
-        return;
-      }
-      response.pipe(file);
-      file.on('finish', () => {
-        file.close();
-        logInfo('get-pip.py download finished.');
-        resolve();
+    fetch(getPipUrl)
+      .then(response => {
+        if (response.status !== 200) {
+          logError('Failed to download get-pip.py: ' + response.status);
+          reject(new Error('Failed to download get-pip.py: ' + response.status));
+          return;
+        }
+        const file = createWriteStream(getPipPath);
+        response.body.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          logInfo('get-pip.py download finished.');
+          resolve();
+        });
+      })
+      .catch(err => {
+        logError(`Download error (get-pip.py): ${err}`);
+        reject(err);
       });
-    }).on('error', (err) => {
-      logError(`Download error (get-pip.py): ${err}`);
-      reject(err);
-    });
   });
 
   // Run get-pip.py
   await new Promise<void>((resolve, reject) => {
-    const proc = spawn(PYTHON_EXE, [getPipPath], { stdio: 'pipe' });
+    const proc = spawn(PYTHON_EXE, [getPipPath, '--no-warn-script-location'], { stdio: 'pipe' });
+
     proc.stdout.on('data', (data) => logInfo(`[get-pip.py][stdout] ${data}`));
     proc.stderr.on('data', (data) => logError(`[get-pip.py][stderr] ${data}`));
+    
     proc.on('close', (code) => {
       if (code === 0) {
         logInfo('pip installed successfully via get-pip.py.');
@@ -148,31 +152,75 @@ async function ensurePipInstalled() {
   }
 }
 
-async function installRequirements() {
+async function downloadRAUXWheel(): Promise<string> {
+  logInfo('Downloading RAUX wheel...');
+  const wheelDir = join(getAppInstallDir(), 'wheels');
+  mkdirSync(wheelDir, { recursive: true });
+  const wheelPath = join(wheelDir, 'open_webui-0.6.5+raux.0.1.0-py3-none-any.whl');
 
-  const requirementsPath = join(getBackendDir(), 'requirements.txt');
+  // Get the version directly from the environment variable defined by webpack
+  const rauxVersion = process.env.RAUX_VERSION || 'latest';
+  logInfo(`Using RAUX version: ${rauxVersion}`);
+  
+  // Construct URL with specific version if provided
+  let wheelUrl: string;
+  if (rauxVersion === 'latest') {
+    wheelUrl = process.env.RAUX_WHEEL_URL || 'https://github.com/aigdat/raux/releases/latest/download/open_webui-0.6.5+raux.0.1.0-py3-none-any.whl';
+  } else {
+    // Remove the 'v' prefix if present for consistent URL formatting
+    const versionStr = rauxVersion.startsWith('v') ? rauxVersion.substring(1) : rauxVersion;
+    wheelUrl = process.env.RAUX_WHEEL_URL || 
+               `https://github.com/aigdat/raux/releases/download/v${versionStr}/open_webui-0.6.5+raux.0.1.0-py3-none-any.whl`;
+  }
+  
+  logInfo(`Downloading wheel from URL: ${wheelUrl}`);
+  
+  return new Promise<string>((resolve, reject) => {
+    fetch(wheelUrl)
+      .then(response => {
+        if (response.status !== 200) {
+          logError('Failed to download RAUX wheel: ' + response.status);
+          reject(new Error('Failed to download RAUX wheel: ' + response.status));
+          return;
+        }
+        const file = createWriteStream(wheelPath);
+        response.body.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          logInfo(`RAUX wheel downloaded to ${wheelPath}`);
+          resolve(wheelPath);
+        });
+      })
+      .catch(err => {
+        logError(`Wheel download error: ${err}`);
+        reject(err);
+      });
+  });
+}
 
-  logInfo(`Installing requirements from '${requirementsPath}'`);
-  logInfo(`Using '${PYTHON_EXE}' to install requirements`);
-
+async function installRAUXWheel(wheelPath: string): Promise<void> {
+  logInfo(`Installing RAUX wheel from ${wheelPath}...`);
+  
   return new Promise<void>((resolve, reject) => {
-    const proc = spawn(PYTHON_EXE, ['-m', 'pip', 'install', '-r', requirementsPath], {
-      cwd: getBackendDir(),
-      stdio: 'pipe',
+    const proc = spawn(PYTHON_EXE, ['-m', 'pip', 'install', wheelPath, '--verbose', '--no-warn-script-location'], {
+      stdio: 'pipe'
     });
-    proc.stdout.on('data', (data) => logInfo(`[pip-install][stdout] ${data}`));
-    proc.stderr.on('data', (data) => logError(`[pip-install][stderr] ${data}`));
+
+    proc.stdout.on('data', (data) => logInfo(`[wheel-install][stdout] ${data}`));
+    proc.stderr.on('data', (data) => logError(`[wheel-install][stderr] ${data}`));
+
     proc.on('close', (code) => {
       if (code === 0) {
-        logInfo('Requirements installed successfully.');
+        logInfo('RAUX wheel installed successfully.');
         resolve();
       } else {
-        logError('pip install failed');
-        reject(new Error('pip install failed'));
+        logError(`Failed to install RAUX wheel. Exit code: ${code}`);
+        reject(new Error(`Failed to install RAUX wheel. Exit code: ${code}`));
       }
     });
+
     proc.on('error', (err) => {
-      logError(`pip install process error: ${err}`);
+      logError(`Wheel installation process error: ${err}`);
       reject(err);
     });
   });
@@ -190,7 +238,18 @@ export async function ensurePythonAndPipInstalled() {
     await downloadPython(url, zipPath);
     await extractPython(zipPath, PYTHON_DIR);
     await ensurePipInstalled();
-    await installRequirements();
+    
+    // Download and install RAUX wheel before installing other requirements
+    try {
+      const wheelPath = await downloadRAUXWheel();
+      await installRAUXWheel(wheelPath);
+      logInfo('RAUX wheel setup completed successfully.');
+    } catch (wheelError) {
+      logError(`RAUX wheel installation failed: ${wheelError}`);
+      logError('Falling back to requirements.txt installation...');
+      // Continue with requirements.txt as fallback
+    }
+    
     logInfo('Python and pip setup completed successfully.');
   } catch (err) {
     logError(`ensurePythonAndPipInstalled failed: ${err}`);

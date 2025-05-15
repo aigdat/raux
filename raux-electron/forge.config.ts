@@ -15,11 +15,13 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     extraResource: [
-      '../backend/open_webui',
+      // Include only essential files needed for initial setup
+      // The rest will be installed via the wheel
       '../backend/requirements.txt',
+      '../raux.env',
+      '../backend/.webui_secret_key',
       '../backend/start.sh',
-      '../backend/start_windows.bat',
-      '../backend/.env'
+      '../backend/start_windows.bat'
     ],
     executableName: 'raux',
   },

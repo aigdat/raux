@@ -25,6 +25,7 @@ if (handleSquirrelEvent()) {
 
 logInfo(`Current Environment: ${isDev ? 'Development' : 'Production'}`);
 logInfo(`Install dir: ${getAppInstallDir()}`);
+logInfo(`RAUX Version: ${process.env.RAUX_VERSION || 'latest'}`);
 
 const createWindow = async (): Promise<void> => {
   try {
