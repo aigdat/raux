@@ -27,6 +27,7 @@ alwaysApply: true
 - Always start with a plan and analysis, not immediate solutions.
 - Describe what you see in the current state.
 - Identify potential issues before suggesting fixes.
+- Run OS specific CLI tools to help you analyze
 
 3. ONE STEP AT A TIME
 - Focus on one task at a time.

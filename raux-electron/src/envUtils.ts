@@ -33,8 +33,8 @@ export function getBackendDir() {
   if (isDev) {
     return join(__dirname, '../../../backend');
   }
-  // Use app install dir for backend
-  return join(getAppInstallDir(), 'backend');
+  // Use the resources directory of the running app version
+  return require('path').dirname(app.getAppPath());
 }
 
 // Python executable path

@@ -2,38 +2,6 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Clean RAUX Environment: AppData",
-			"type": "shell",
-			"command": "cmd",
-			"args": [
-				"/c",
-				"conda deactivate & rmdir /s /q \"%LOCALAPPDATA%\\GAIA\\RAUX\" & del /f /q \"%USERPROFILE%\\Desktop\\GAIA-UI-BETA.lnk\" & conda env remove -p \"%LOCALAPPDATA%\\GAIA\\RAUX\\raux_env\" -y"
-			],
-			"presentation": {
-				"reveal": "silent",
-				"panel": "new"
-			},
-			"problemMatcher": []
-		},
-		{
-			"label": "Clean RAUX: Development",
-			"type": "shell",
-			"command": "rm",
-			"args": [
-				"-rf",
-				"${workspaceFolder}/backend/data/cache/",
-				"${workspaceFolder}/backend/data/uploads/",
-				"${workspaceFolder}/backend/data/vector_db/",
-				"${workspaceFolder}/backend/data/webui.db"
-			],
-			"presentation": {
-				"reveal": "always",
-				"panel": "new",
-				"close": true
-			},
-			"problemMatcher": []
-		},
-		{
 			"label": "start-frontend",
 			"type": "npm",
 			"script": "dev",
@@ -107,8 +75,41 @@
 				"close": true
 			},
 			"group": "build",
+			"problemMatcher": [],
+			"dependsOn": ["Clean RAUX Environment: AppData"]
+		},
+		{
+			"label": "Clean RAUX Environment: AppData",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"rmdir /s /q \"%LOCALAPPDATA%\\raux\" & rmdir /s /q \"%APPDATA%\\raux\""
+			],
+			"presentation": {
+				"reveal": "silent",
+				"panel": "new"
+			},
 			"problemMatcher": []
-		}
+		},
+		{
+			"label": "Clean RAUX: Development",
+			"type": "shell",
+			"command": "rm",
+			"args": [
+				"-rf",
+				"${workspaceFolder}/backend/data/cache/",
+				"${workspaceFolder}/backend/data/uploads/",
+				"${workspaceFolder}/backend/data/vector_db/",
+				"${workspaceFolder}/backend/data/webui.db"
+			],
+			"presentation": {
+				"reveal": "always",
+				"panel": "new",
+				"close": true
+			},
+			"problemMatcher": []
+		},
 	],
 	"inputs": [
 		{

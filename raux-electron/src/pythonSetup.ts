@@ -111,12 +111,52 @@ async function ensurePipInstalled() {
   } catch (err) {
     logError(`Failed to delete get-pip.py: ${err}`);
   }
+
+  // Patch python311._pth to include Lib and Lib\site-packages
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    // Find the ._pth file (e.g., python311._pth)
+    const files = fs.readdirSync(PYTHON_DIR);
+    const pthFile = files.find(f => /^python\d+\d+\._pth$/.test(f));
+    
+    if (!pthFile) {
+      logError('No python*._pth file found to patch.');
+      return;
+    }
+
+    const pthPath = path.join(PYTHON_DIR, pthFile);
+    let content = fs.readFileSync(pthPath, 'utf-8');
+    let changed = false;
+    if (!content.match(/^Lib\s*$/m)) {
+      content += '\nLib\n';
+      changed = true;
+    }
+    if (!content.match(/^Lib\\site-packages\s*$/m)) {
+      content += 'Lib\\site-packages\n';
+      changed = true;
+    }
+    if (changed) {
+      fs.writeFileSync(pthPath, content, 'utf-8');
+      logInfo(`Patched ${pthFile} to include Lib and Lib\\site-packages.`);
+    } else {
+      logInfo(`${pthFile} already includes Lib and Lib\\site-packages.`);
+    }
+
+  } catch (err) {
+    logError(`Failed to patch python*._pth: ${err}`);
+  }
 }
 
 async function installRequirements() {
-  logInfo('Installing requirements...');
+
+  const requirementsPath = join(getBackendDir(), 'requirements.txt');
+
+  logInfo(`Installing requirements from '${requirementsPath}'`);
+  logInfo(`Using '${PYTHON_EXE}' to install requirements`);
+
   return new Promise<void>((resolve, reject) => {
-    const proc = spawn(PYTHON_EXE, ['-m', 'pip', 'install', '-r', join(getBackendDir(), 'requirements.txt')], {
+    const proc = spawn(PYTHON_EXE, ['-m', 'pip', 'install', '-r', requirementsPath], {
       cwd: getBackendDir(),
       stdio: 'pipe',
     });
