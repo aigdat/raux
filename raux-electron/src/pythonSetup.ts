@@ -232,6 +232,7 @@ export async function ensurePythonAndPipInstalled() {
     if (existsSync(PYTHON_DIR)) {
       rmSync(PYTHON_DIR, { recursive: true, force: true });
     }
+    
     mkdirSync(PYTHON_DIR, { recursive: true });
     const url = getPythonDownloadUrl();
     const zipPath = join(PYTHON_DIR, 'python-embed.zip');
@@ -249,10 +250,42 @@ export async function ensurePythonAndPipInstalled() {
       logError('Falling back to requirements.txt installation...');
       // Continue with requirements.txt as fallback
     }
+
+    // Copy raux.env to python/Lib/.env (always overwrite)
+    await copyEnvToPythonLib();
     
     logInfo('Python and pip setup completed successfully.');
   } catch (err) {
     logError(`ensurePythonAndPipInstalled failed: ${err}`);
     throw err;
+  }
+}
+
+// Copy raux.env from Electron resources to python/Lib/.env, always overwriting
+async function copyEnvToPythonLib() {
+  try {
+    // Electron's resourcesPath is available via process.resourcesPath
+    // In dev mode, fallback to getAppInstallDir()/resources
+    const isPackaged = !!process.resourcesPath;
+    const resourcesDir = isPackaged
+      ? process.resourcesPath
+      : join(getAppInstallDir(), 'resources');
+    const srcEnv = join(resourcesDir, 'raux.env');
+    const destEnv = join(PYTHON_DIR, 'Lib', '.env');
+    if (!existsSync(srcEnv)) {
+      logError(`copyEnvToPythonLib: Source raux.env not found at ${srcEnv}`);
+      return;
+    }
+    // Ensure Lib directory exists
+    const libDir = join(PYTHON_DIR, 'Lib');
+    if (!existsSync(libDir)) {
+      mkdirSync(libDir, { recursive: true });
+    }
+    // Copy and overwrite
+    const fs = await import('fs');
+    fs.copyFileSync(srcEnv, destEnv);
+    logInfo(`Copied raux.env to ${destEnv}`);
+  } catch (err) {
+    logError(`copyEnvToPythonLib failed: ${err}`);
   }
 } 

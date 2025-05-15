@@ -1,6 +1,6 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { existsSync, copyFileSync, readFileSync, writeFileSync, appendFileSync, openSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { isDev, getAppInstallDir, getBackendDir, getPythonPath } from './envUtils';
 import { logInfo, logError } from './logger';
 import { ensurePythonAndPipInstalled } from './pythonSetup';
@@ -105,8 +105,6 @@ class RauxProcessManager {
       
       const secretKey = this.ensureSecretKey();
 
-      await ensurePythonAndPipInstalled();
-
       // Set up environment variables
       const env: NodeJS.ProcessEnv = {
         ...process.env,
@@ -144,15 +142,11 @@ class RauxProcessManager {
             '--workers', env.UVICORN_WORKERS || '1',
           ];
         } else {
-          executable = this.pythonPath;
-          args = [
-            '-m', 'uvicorn',
-            'open_webui.main:app',
-            '--host', env.HOST!,
-            '--port', env.PORT!,
-            '--forwarded-allow-ips', '*',
-            '--workers', env.UVICORN_WORKERS || '1',
-          ];
+          const pythonDir = dirname(this.pythonPath);
+          const scriptsDir = join(pythonDir, 'Scripts');
+          const openWebuiExe = join(scriptsDir, 'open-webui.exe');
+          executable = openWebuiExe;
+          args = ['serve'];
         }
         logInfo(`[RauxProcessManager] Spawning RAUX backend:`);
         logInfo(`[RauxProcessManager]   Executable: ${executable}`);
