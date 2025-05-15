@@ -15,7 +15,7 @@ export function getAppInstallDir() {
     const localAppData = process.env.LOCALAPPDATA || join(os.homedir(), 'AppData', 'Local');
     return join(localAppData, 'raux');
   }
-  // On other OS, fallback to appData/raux
+
   return join(app.getPath('appData'), 'raux');
 }
 

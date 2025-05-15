@@ -21,13 +21,14 @@ const config: ForgeConfig = {
       '../backend/start_windows.bat',
       '../backend/.env'
     ],
-    executableName: 'raux-setup',
+    executableName: 'raux',
   },
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
-      name: 'raux-setup',
-      exe: 'raux-setup.exe',
+      name: 'raux',
+      exe: 'raux.exe',
+      setupExe: 'raux-setup.exe',
     }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({}),
