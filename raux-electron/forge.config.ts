@@ -20,7 +20,6 @@ const config: ForgeConfig = {
       '../backend/requirements.txt',
       '../raux-generic.env',
       '../raux-hybrid.env',
-      '../backend/.webui_secret_key',
       '../backend/start.sh',
       '../backend/start_windows.bat'
     ],
