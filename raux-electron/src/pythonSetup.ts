@@ -153,54 +153,81 @@ async function ensurePipInstalled() {
 }
 
 async function downloadRAUXWheel(): Promise<string> {
-  logInfo('Downloading RAUX wheel...');
+  logInfo('Downloading RAUX build context zip...');
   const wheelDir = join(getAppInstallDir(), 'wheels');
+
   mkdirSync(wheelDir, { recursive: true });
-  const wheelPath = join(wheelDir, 'open_webui-0.6.5+raux.0.1.0-py3-none-any.whl');
 
   // Get the version directly from the environment variable defined by webpack
   const rauxVersion = process.env.RAUX_VERSION || 'latest';
   logInfo(`Using RAUX version: ${rauxVersion}`);
-  
-  // Construct URL with specific version if provided
-  let wheelUrl: string;
+
+  // Construct URL for the zip file
+  let zipUrl: string;
   if (rauxVersion === 'latest') {
-    wheelUrl = process.env.RAUX_WHEEL_URL || 'https://github.com/aigdat/raux/releases/latest/download/open_webui-0.6.5+raux.0.1.0-py3-none-any.whl';
+    zipUrl = process.env.RAUX_WHEEL_URL || 'https://github.com/aigdat/raux/releases/latest/download/raux-build-context.zip';
   } else {
     // Remove the 'v' prefix if present for consistent URL formatting
     const versionStr = rauxVersion.startsWith('v') ? rauxVersion.substring(1) : rauxVersion;
-    wheelUrl = process.env.RAUX_WHEEL_URL || 
-               `https://github.com/aigdat/raux/releases/download/v${versionStr}/open_webui-0.6.5+raux.0.1.0-py3-none-any.whl`;
+    zipUrl = process.env.RAUX_WHEEL_URL || 
+             `https://github.com/aigdat/raux/releases/download/v${versionStr}/raux-build-context.zip`;
   }
-  
-  logInfo(`Downloading wheel from URL: ${wheelUrl}`);
-  
-  return new Promise<string>((resolve, reject) => {
-    fetch(wheelUrl)
+
+  logInfo(`Downloading build context zip from URL: ${zipUrl}`);
+
+  // Download the zip file to a temp directory
+  const tmpDir = join(wheelDir, `tmp-${Date.now()}`);
+  mkdirSync(tmpDir, { recursive: true });
+  const zipPath = join(tmpDir, 'raux-build-context.zip');
+
+  await new Promise<void>((resolve, reject) => {
+    fetch(zipUrl)
       .then(response => {
         if (response.status !== 200) {
-          logError('Failed to download RAUX wheel: ' + response.status);
-          reject(new Error('Failed to download RAUX wheel: ' + response.status));
+          logError('Failed to download build context zip: ' + response.status);
+          reject(new Error('Failed to download build context zip: ' + response.status));
           return;
         }
-        const file = createWriteStream(wheelPath);
+        const file = createWriteStream(zipPath);
         response.body.pipe(file);
         file.on('finish', () => {
           file.close();
-          logInfo(`RAUX wheel downloaded to ${wheelPath}`);
-          resolve(wheelPath);
+          logInfo('Build context zip download finished.');
+          resolve();
         });
       })
       .catch(err => {
-        logError(`Wheel download error: ${err}`);
+        logError(`Build context zip download error: ${err}`);
         reject(err);
       });
   });
+
+  // Extract the zip file
+  logInfo('Extracting build context zip...');
+
+  try {
+    await extract(zipPath, { dir: tmpDir });
+    logInfo('Build context extraction finished.');
+  } catch (error) {
+    logError(`Failed to extract build context zip: ${error}`);
+    throw error;
+  }
+
+  // Return the temp directory path
+  return tmpDir;
 }
 
-async function installRAUXWheel(wheelPath: string): Promise<void> {
-  logInfo(`Installing RAUX wheel from ${wheelPath}...`);
-  
+async function installRAUXWheel(extractDir: string): Promise<void> {
+  logInfo(`Installing RAUX wheel from directory: ${extractDir}...`);
+  const fs = await import('fs');
+  const path = await import('path');
+  const whlFile = fs.readdirSync(extractDir).find(f => f === 'raux.whl');
+  if (!whlFile) {
+    logError('No raux.whl file found in extracted build context.');
+    throw new Error('No raux.whl file found in extracted build context.');
+  }
+  const wheelPath = path.join(extractDir, whlFile);
+
   return new Promise<void>((resolve, reject) => {
     const proc = spawn(PYTHON_EXE, ['-m', 'pip', 'install', wheelPath, '--verbose', '--no-warn-script-location'], {
       stdio: 'pipe'
@@ -227,6 +254,7 @@ async function installRAUXWheel(wheelPath: string): Promise<void> {
 }
 
 export async function ensurePythonAndPipInstalled() {
+  let tmpDir: string | null = null;
   try {
     // If PYTHON_DIR exists, assume setup is complete and skip installation
     if (existsSync(PYTHON_DIR)) {
@@ -247,8 +275,8 @@ export async function ensurePythonAndPipInstalled() {
     
     // Download and install RAUX wheel before installing other requirements
     try {
-      const wheelPath = await downloadRAUXWheel();
-      await installRAUXWheel(wheelPath);
+      tmpDir = await downloadRAUXWheel();
+      await installRAUXWheel(tmpDir);
       logInfo('RAUX wheel setup completed successfully.');
     } catch (wheelError) {
       logError(`RAUX wheel installation failed: ${wheelError}`);
@@ -259,6 +287,16 @@ export async function ensurePythonAndPipInstalled() {
     // Copy raux.env to python/Lib/.env (always overwrite)
     await copyEnvToPythonLib();
     
+    // Remove the temp directory after copyEnvToPythonLib
+    if (tmpDir) {
+      try {
+        rmSync(tmpDir, { recursive: true, force: true });
+        logInfo(`Temporary directory ${tmpDir} removed.`);
+      } catch (err) {
+        logError(`Failed to remove temporary directory ${tmpDir}: ${err}`);
+      }
+    }
+
     logInfo('Python and pip setup completed successfully.');
   } catch (err) {
     logError(`ensurePythonAndPipInstalled failed: ${err}`);

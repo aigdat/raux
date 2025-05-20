@@ -18,8 +18,6 @@ const config: ForgeConfig = {
       // Include only essential files needed for initial setup
       // The rest will be installed via the wheel
       '../backend/requirements.txt',
-      '../raux-generic.env',
-      '../raux-hybrid.env',
       '../backend/start.sh',
       '../backend/start_windows.bat'
     ],
