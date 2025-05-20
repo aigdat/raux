@@ -173,8 +173,8 @@ jobs:
       - name: List files in current directory
         run: |
           pwd
-          ls -al
-          ls -al backend || echo "No backend directory found"
+          ls
+          ls backend
 
       - name: Setup RAUX Environment (generic)
         run: |
