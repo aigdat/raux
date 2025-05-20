@@ -53,45 +53,29 @@ jobs:
 
       - name: Build wheel
         run: |
-          # Edit or create pyproject.toml to include version from workflow
-          echo "Building wheel for RAUX v${{ needs.build-preparation.outputs.raux_version }}"
-          
-          # Remove 'v' prefix if present for pyproject.toml
-          RAUX_VERSION="${{ needs.build-preparation.outputs.raux_version }}"
-          if [[ $RAUX_VERSION == v* ]]; then
-            RAUX_VERSION="${RAUX_VERSION:1}"
-          fi
-          
-          sed -i "s/version = \".*\"/version = \"$RAUX_VERSION\"/" pyproject.toml
-          
-          # Build the wheel
           python -m build --wheel
-          
-          # List the built wheel
 
-      - name: List files in current directory
+      - name: Rename wheel to raux.whl
         run: |
-          pwd
-          ls
-          ls dist/
+          mv dist/*.whl dist/raux.whl
 
       - name: Prepare build context for zipping
         run: |
           mkdir build-context
-          cp dist/*.whl build-context/
+          cp dist/raux.whl build-context/
           cp raux-hybrid.env build-context/
           cp raux-generic.env build-context/
 
       - name: Create build context zip
         run: |
           cd build-context
-          zip -r ../raux-build-context.zip .
+          zip -r ../raux-wheel-context.zip .
 
       - name: Upload build context zip artifact
         uses: actions/upload-artifact@v4
         with:
-          name: raux-build-context
-          path: raux-build-context.zip
+          name: raux-wheel-context
+          path: raux-wheel-context.zip
           retention-days: 7
 
   build-electron:
