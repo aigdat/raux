@@ -173,8 +173,7 @@ jobs:
       - name: List files in current directory
         run: |
           pwd
-          Get-ChildItem -Recurse -Filter *.env
-          Get-ChildItem -Recurse -Filter backend
+          ls
 
       - name: Setup RAUX Environment (generic)
         run: |
