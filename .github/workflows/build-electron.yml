@@ -68,14 +68,19 @@ jobs:
           python -m build --wheel
           
           # List the built wheel
-          ls -la dist/
+
+      - name: List files in current directory
+        run: |
+          pwd
+          ls
+          ls dist/
 
       - name: Prepare build context for zipping
         run: |
           mkdir build-context
           cp dist/*.whl build-context/
-          cp ../raux-hybrid.env build-context/
-          cp ../raux-generic.env build-context/
+          cp raux-hybrid.env build-context/
+          cp raux-generic.env build-context/
 
       - name: Create build context zip
         run: |
@@ -141,8 +146,6 @@ jobs:
           path: |
             raux-electron
             backend
-            raux-hybrid.env
-            raux-generic.env
             CHANGELOG.md
             package.json
 
