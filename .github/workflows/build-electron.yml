@@ -113,12 +113,13 @@ jobs:
       - name: Extract CHANGELOG entry
         id: changelog
         run: |
-          $pattern = "## [v$(${{ needs.build-preparation.outputs.production_version }})]"
+          $version = "${{ needs.build-preparation.outputs.production_version }}"
+          $pattern = "## [v$version]"
           $content = Get-Content CHANGELOG.md -Raw
           $regex = "(?s)$pattern(.*?)(?=\n## \[v|$)"
           $notes = [regex]::Match($content, $regex).Groups[1].Value
           if ([string]::IsNullOrEmpty($notes)) {
-            $notes = "Release v$(${{ needs.build-preparation.outputs.production_version }})%0ANo release notes available."
+            $notes = "Release v$version%0ANo release notes available."
           }
           $notes = $notes -replace "\n", "%0A"
           echo "notes=$notes" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
