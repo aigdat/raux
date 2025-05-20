@@ -173,7 +173,7 @@ jobs:
       - name: List files in current directory
         run: |
           pwd
-          ls
+          dir
 
       - name: Setup RAUX Environment (generic)
         run: |
@@ -217,12 +217,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: raux-wheel
-
-      - name: List files in current directory
-        run: |
-          pwd
-          ls -al
-          ls -al backend || echo "No backend directory found"
 
       - name: Setup RAUX Environment (hybrid)
         run: |
