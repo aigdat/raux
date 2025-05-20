@@ -224,14 +224,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: List files in current directory
-        run: |
-          pwd
-          dir
-
       - name: Setup RAUX Environment (hybrid)
         run: |
           cp raux-hybrid.env backend\.env
+
+      - name: List files in current directory
+        run: |
+          cd raux-electron
+          Get-ChildItem -Recurse
 
       - name: Rename installer to raux-hybrid-setup.exe
         run: |
