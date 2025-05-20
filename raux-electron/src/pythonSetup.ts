@@ -6,6 +6,7 @@ import fetch from 'node-fetch';
 import extract from 'extract-zip';
 import { spawn } from 'child_process';
 import { logInfo, logError } from './logger';
+import type { Response } from 'node-fetch';
 
 const PYTHON_VERSION = '3.11.8';
 const PYTHON_DIR = join(getAppInstallDir(), 'python');
@@ -26,7 +27,7 @@ async function downloadPython(url: string, zipPath: string) {
   logInfo('Downloading Python...');
   return new Promise<void>((resolve, reject) => {
     fetch(url)
-      .then(response => {
+      .then((response: Response) => {
         if (response.status !== 200) {
           logError('Failed to download Python: ' + response.status);
           reject(new Error('Failed to download Python: ' + response.status));
@@ -40,7 +41,7 @@ async function downloadPython(url: string, zipPath: string) {
           resolve();
         });
       })
-      .catch(err => {
+      .catch((err: Error) => {
         logError(`Download error: ${err}`);
         reject(err);
       });
@@ -66,7 +67,7 @@ async function ensurePipInstalled() {
   // Download get-pip.py
   await new Promise<void>((resolve, reject) => {
     fetch(getPipUrl)
-      .then(response => {
+      .then((response: Response) => {
         if (response.status !== 200) {
           logError('Failed to download get-pip.py: ' + response.status);
           reject(new Error('Failed to download get-pip.py: ' + response.status));
@@ -80,7 +81,7 @@ async function ensurePipInstalled() {
           resolve();
         });
       })
-      .catch(err => {
+      .catch((err: Error) => {
         logError(`Download error (get-pip.py): ${err}`);
         reject(err);
       });
@@ -177,7 +178,7 @@ async function downloadRAUXWheel(): Promise<string> {
   
   return new Promise<string>((resolve, reject) => {
     fetch(wheelUrl)
-      .then(response => {
+      .then((response: Response) => {
         if (response.status !== 200) {
           logError('Failed to download RAUX wheel: ' + response.status);
           reject(new Error('Failed to download RAUX wheel: ' + response.status));
@@ -191,7 +192,7 @@ async function downloadRAUXWheel(): Promise<string> {
           resolve(wheelPath);
         });
       })
-      .catch(err => {
+      .catch((err: Error) => {
         logError(`Wheel download error: ${err}`);
         reject(err);
       });
