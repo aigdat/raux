@@ -70,16 +70,30 @@ jobs:
           # List the built wheel
           ls -la dist/
 
-      - name: Upload wheel artifact
+      - name: Prepare build context for zipping
+        run: |
+          mkdir build-context
+          cp dist/*.whl build-context/
+          cp ../raux-hybrid.env build-context/
+          cp ../raux-generic.env build-context/
+
+      - name: Create build context zip
+        run: |
+          cd build-context
+          zip -r ../raux-build-context.zip .
+
+      - name: Upload build context zip artifact
         uses: actions/upload-artifact@v4
         with:
-          name: raux-wheel
-          path: dist/*.whl
+          name: raux-build-context
+          path: raux-build-context.zip
           retention-days: 7
 
   build-electron:
     needs: [build-preparation, build-wheel]
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
+    outputs:
+      changelog_notes: ${{ steps.changelog.outputs.notes }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -91,38 +105,18 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'raux-electron/package-lock.json'
 
-      - name: Get production version from RAUX/package.json
-        id: get-production-version
-        run: |
-          $VERSION = (Get-Content package.json | ConvertFrom-Json).version
-          echo "version=$VERSION" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-
-      - name: Get electron version from RAUX/raux-electron/package.json
-        id: get-electron-version
-        run: |
-          $VERSION = (Get-Content raux-electron/package.json | ConvertFrom-Json).version
-          echo "version=$VERSION" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-
-      - name: Get RAUX version from RAUX/raux-electron/package.json
-        id: get-raux-version
-        run: |
-          $VERSION = (Get-Content raux-electron/package.json | ConvertFrom-Json).'raux-version'
-          echo "version=$VERSION" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          echo "Using RAUX version: $VERSION for wheel building"
-
       - name: Extract CHANGELOG entry
         id: changelog
         run: |
-          $version = "${{ needs.build-preparation.outputs.production_version }}"
-          $pattern = "## [v$version]"
-          $content = Get-Content CHANGELOG.md -Raw
-          $regex = "(?s)$pattern(.*?)(?=\n## \[v|$)"
-          $notes = [regex]::Match($content, $regex).Groups[1].Value
-          if ([string]::IsNullOrEmpty($notes)) {
-            $notes = "Release v$version%0ANo release notes available."
-          }
-          $notes = $notes -replace "\n", "%0A"
-          echo "notes=$notes" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          pattern="## [v${{ needs.build-preparation.outputs.production_version }}]"
+          content=$(cat CHANGELOG.md)
+          regex="(?s)$pattern(.*?)(?=\n## \[v|$)"
+          notes=$(echo "$content" | perl -0777 -ne "print \$1 if /$regex/")
+          if [ -z "$notes" ]; then
+            notes="Release v${{ needs.build-preparation.outputs.production_version }}%0ANo release notes available."
+          fi
+          notes="${notes//$'\n'/%0A}"
+          echo "notes=$notes" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
         run: |
@@ -131,129 +125,74 @@ jobs:
 
       - name: Update production version in root package.json
         run: |
-          $json = Get-Content package.json | ConvertFrom-Json
-          $json.version = "${{ needs.build-preparation.outputs.production_version }}"
-          $json | ConvertTo-Json -Compress | Set-Content package.json
+          jq '.version = "${{ needs.build-preparation.outputs.production_version }}"' package.json > package.json.tmp && mv package.json.tmp package.json
           echo "Updated root package.json version to ${{ needs.build-preparation.outputs.production_version }}"
 
       - name: Update electron version in raux-electron/package.json
         run: |
           cd raux-electron
-          $json = Get-Content package.json | ConvertFrom-Json
-          $json.version = "${{ needs.build-preparation.outputs.electron_version }}"
-          $json | ConvertTo-Json -Compress | Set-Content package.json
+          jq '.version = "${{ needs.build-preparation.outputs.electron_version }}"' package.json > package.json.tmp && mv package.json.tmp package.json
           echo "Updated raux-electron/package.json version to ${{ needs.build-preparation.outputs.electron_version }}"
+
+      - name: Upload build context
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-context
+          path: |
+            raux-electron
+            backend
+            raux-hybrid.env
+            raux-generic.env
+            CHANGELOG.md
+            package.json
+
+  package-electron:
+    needs: [build-preparation, build-electron]
+    runs-on: windows-latest
+    steps:
+      - name: Download build context
+        uses: actions/download-artifact@v4
+        with:
+          name: build-context
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: 'raux-electron/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd raux-electron
+          npm ci
 
       - name: Build Electron app (Windows)
         run: |
           cd raux-electron
           npm run make
 
-      - name: Upload raw installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-electron-raw-installer
-          path: raux-electron/out/make/squirrel.windows/x64/*.exe
-          retention-days: 7
-
-  package-generic:
-    needs: [build-preparation, build-wheel, build-electron]
-    runs-on: windows-latest
-    steps:
-      - name: Download raw installer
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-electron-raw-installer
-
-      - name: Download build context am 
-        uses: actions/download-artifact@v4
-        with:
-          name: raux-wheel
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: List files in current directory
+      - name: Rename installer to raux-setup.exe
         run: |
-          pwd
-          dir
-
-      - name: Setup RAUX Environment (generic)
+          mv raux-electron/out/make/squirrel.windows/x64/*.exe raux-electron/out/make/squirrel.windows/x64/raux-setup.exe
+  
+      - name: Create SHA256 checksum
         run: |
-          cp raux-generic.env backend\.env
-
-      - name: Rename installer to raux-generic-setup.exe
-        run: |
-          mv raux-electron/out/make/squirrel.windows/x64/*.exe raux-electron/out/make/squirrel.windows/x64/raux-generic-setup.exe
-
-      - name: Create SHA256 checksum (generic)
-        run: |
-          $INSTALLER_PATH = "raux-electron/out/make/squirrel.windows/x64/raux-generic-setup.exe"
+          $INSTALLER_PATH = "raux-electron/out/make/squirrel.windows/x64/raux-setup.exe"
           $CHECKSUM = (Get-FileHash -Path $INSTALLER_PATH -Algorithm SHA256).Hash.ToLower()
           $CHECKSUM | Out-File -FilePath "$INSTALLER_PATH.sha256" -Encoding ascii
           echo "Created checksum for installer: $CHECKSUM"
 
-      - name: Upload installer artifact (generic)
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: raux-generic-setup.exe
-          path: raux-electron/out/make/squirrel.windows/x64/raux-generic-setup.exe
+          name: raux-setup.exe
+          path: raux-electron/out/make/squirrel.windows/x64/raux-setup.exe
           retention-days: 7
 
-      - name: Upload checksum artifact (generic)
+      - name: Upload checksum artifact
         uses: actions/upload-artifact@v4
         with:
-          name: raux-generic-setup.exe.sha256
-          path: raux-electron/out/make/squirrel.windows/x64/raux-generic-setup.exe.sha256
-          retention-days: 7
-
-  package-hybrid:
-    needs: [build-preparation, build-wheel, build-electron]
-    runs-on: windows-latest
-    steps:
-      - name: Download raw installer
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-electron-raw-installer
-
-      - name: Download build context
-        uses: actions/download-artifact@v4
-        with:
-          name: raux-wheel
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup RAUX Environment (hybrid)
-        run: |
-          cp raux-hybrid.env backend\.env
-
-      - name: List files in current directory
-        run: |
-          cd raux-electron
-          Get-ChildItem -Recurse
-
-      - name: Rename installer to raux-hybrid-setup.exe
-        run: |
-          mv raux-electron/out/make/squirrel.windows/x64/*.exe raux-electron/out/make/squirrel.windows/x64/raux-hybrid-setup.exe
-
-      - name: Create SHA256 checksum (hybrid)
-        run: |
-          $INSTALLER_PATH = "raux-electron/out/make/squirrel.windows/x64/raux-hybrid-setup.exe"
-          $CHECKSUM = (Get-FileHash -Path $INSTALLER_PATH -Algorithm SHA256).Hash.ToLower()
-          $CHECKSUM | Out-File -FilePath "$INSTALLER_PATH.sha256" -Encoding ascii
-          echo "Created checksum for installer: $CHECKSUM"
-
-      - name: Upload installer artifact (hybrid)
-        uses: actions/upload-artifact@v4
-        with:
-          name: raux-hybrid-setup.exe
-          path: raux-electron/out/make/squirrel.windows/x64/raux-hybrid-setup.exe
-          retention-days: 7
-
-      - name: Upload checksum artifact (hybrid)
-        uses: actions/upload-artifact@v4
-        with:
-          name: raux-hybrid-setup.exe.sha256
-          path: raux-electron/out/make/squirrel.windows/x64/raux-hybrid-setup.exe.sha256
+          name: raux-setup.exe.sha256
+          path: raux-electron/out/make/squirrel.windows/x64/raux-setup.exe.sha256
           retention-days: 7
