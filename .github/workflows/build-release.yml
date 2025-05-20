@@ -1,141 +1,272 @@
-name: Build and Release Electron App
+name: Build and package solution (main)
 
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., 0.1.0)'
-        required: true
-        default: ''
+    branches:
+      - main
 
 jobs:
-  extract-version:
+  build-and-package:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get-version.outputs.version }}
-      cleaned_version: ${{ steps.clean-version.outputs.version }}
+
+    permissions:
+      contents: write
+      packages: write
+      actions: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set version from tag or input
-        id: get-version
+      - name: Check for changes in package.json
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="${{ github.ref_name }}"
-            # Remove 'v' prefix if present
-            VERSION="${VERSION#v}"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-      
-      - name: Clean version string
-        id: clean-version
-        run: |
-          # Remove any non-numeric/dot characters for use in file names
-          CLEAN_VERSION=$(echo "${{ steps.get-version.outputs.version }}" | sed 's/[^0-9\.]//g')
-          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
-      
-  build-electron:
-    needs: extract-version
-    runs-on: windows-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: 'npm'
-          cache-dependency-path: 'raux-electron/package-lock.json'
-
-      - name: Extract CHANGELOG entry
-        id: changelog
-        run: |
-          $pattern = "## [v${{ needs.extract-version.outputs.version }}]"
-          $content = Get-Content CHANGELOG.md -Raw
-          $regex = "(?s)$pattern(.*?)(?=\n## \[v|$)"
-          $match = [regex]::Match($content, $regex)
-          if ($match.Success) {
-              $notes = $match.Groups[1].Value.Trim()
-              # Convert notes to a format that can be passed in the GitHub environment
-              $notes = $notes -replace "`n", "%0A"
-              echo "notes=$notes" >> $env:GITHUB_OUTPUT
-          } else {
-              echo "notes=Release v${{ needs.extract-version.outputs.version }}%0ANo release notes available." >> $env:GITHUB_OUTPUT
-          }
-
-      - name: Install dependencies
-        run: |
-          cd raux-electron
-          npm ci
-
-      - name: Update version in package.json
-        run: |
-          cd raux-electron
-          $packageJson = Get-Content -Path package.json -Raw | ConvertFrom-Json
-          $packageJson.version = "${{ needs.extract-version.outputs.version }}"
-          $packageJson | ConvertTo-Json -Depth 100 | Set-Content -Path package.json
-          echo "Updated package.json version to ${{ needs.extract-version.outputs.version }}"
-
-      - name: Build Electron app
-        run: |
-          cd raux-electron
-          npm run make
-
-      - name: Find generated files
-        id: find-files
-        run: |
-          # Find NSIS installer
-          $INSTALLER = Get-ChildItem -Path "raux-electron\out\make\squirrel.windows\x64\*.exe" -Recurse | Select-Object -First 1
-          if ($INSTALLER) {
-            echo "installer_path=$($INSTALLER.FullName)" >> $env:GITHUB_OUTPUT
-            echo "installer_name=$($INSTALLER.Name)" >> $env:GITHUB_OUTPUT
-            echo "Found installer: $($INSTALLER.FullName)"
-          } else {
-            echo "Error: No installer found!"
+          git diff --cached --diff-filter=d package.json || {
+            echo "No changes to package.json"
             exit 1
           }
-
-          # Find zip file if available
-          $ZIP = Get-ChildItem -Path "raux-electron\out\make\zip\win32\x64\*.zip" -Recurse | Select-Object -First 1
-          if ($ZIP) {
-            echo "zip_path=$($ZIP.FullName)" >> $env:GITHUB_OUTPUT
-            echo "zip_name=$($ZIP.Name)" >> $env:GITHUB_OUTPUT
-            echo "Found zip: $($ZIP.FullName)"
-          }
-
-      - name: Create SHA256 checksum
+      - name: Get version number from package.json
+        id: get_version
         run: |
-          $INSTALLER_PATH = "${{ steps.find-files.outputs.installer_path }}"
-          $CHECKSUM = (Get-FileHash -Path $INSTALLER_PATH -Algorithm SHA256).Hash.ToLower()
-          $CHECKSUM | Out-File -FilePath "$INSTALLER_PATH.sha256" -Encoding ascii
-          echo "Created checksum for installer: $CHECKSUM"
+          VERSION=$(jq -r '.version' package.json)
+          echo "::set-output name=version::$VERSION"
+      - name: Extract latest CHANGELOG entry
+        id: changelog
+        run: |
+          CHANGELOG_CONTENT=$(awk 'BEGIN {print_section=0;} /^## \[/ {if (print_section == 0) {print_section=1;} else {exit;}} print_section {print;}' CHANGELOG.md)
+          CHANGELOG_ESCAPED=$(echo "$CHANGELOG_CONTENT" | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "Extracted latest release notes from CHANGELOG.md:" 
+          echo -e "$CHANGELOG_CONTENT" 
+          echo "::set-output name=content::$CHANGELOG_ESCAPED"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+          python -m build .
       - name: Create GitHub release
         id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: actions/github-script@v7
         with:
-          files: |
-            ${{ steps.find-files.outputs.installer_path }}
-            ${{ steps.find-files.outputs.installer_path }}.sha256
-            ${{ steps.find-files.outputs.zip_path }}
-          tag_name: v${{ needs.extract-version.outputs.version }}
-          name: v${{ needs.extract-version.outputs.version }}
-          body: ${{ steps.changelog.outputs.notes }}
-          draft: false
-          prerelease: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const changelog = `${{ steps.changelog.outputs.content }}`;
+            const release = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: `v${{ steps.get_version.outputs.version }}`,
+              name: `v${{ steps.get_version.outputs.version }}`,
+              body: changelog,
+            })
+            console.log(`Created release ${release.data.html_url}`)
+            return release.data.id;
+      - name: Upload package to GitHub release
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: |
+            .
+            !.git
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload additional build artifacts
+      - name: Upload wheel to GitHub release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*.whl
+          tag_name: v${{ steps.get_version.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      # Save the wheel file as an artifact for the create-installer job
+      - name: Save wheel as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
-          path: raux-electron/out/
-          retention-days: 7
+          name: wheel-file
+          path: dist/*.whl
+          retention-days: 1
+
+  publish-installer:
+    needs: build-and-package
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history to ensure we have all files
+
+      - name: List repository contents
+        run: |
+          Write-Host "Listing repository root contents:"
+          Get-ChildItem -Path .
+          
+          Write-Host "Checking if installer directory exists:"
+          if (Test-Path -Path "installer") {
+            Write-Host "Installer directory exists. Listing contents:"
+            Get-ChildItem -Path "installer"
+          } else {
+            Write-Host "Installer directory does not exist!"
+          }
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      - name: Get version from package.json
+        id: get_version
+        run: |
+          $VERSION = (Get-Content package.json | ConvertFrom-Json).version
+          echo "VERSION=$VERSION" >> $env:GITHUB_ENV
+          echo "RELEASE_TAG=v$VERSION" >> $env:GITHUB_ENV
+      # Download the wheel file directly from the artifact
+      - name: Download wheel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wheel-file
+          path: dist
+
+      - name: List downloaded wheel files
+        run: |
+          Write-Host "Listing downloaded wheel files:"
+          Get-ChildItem -Path dist -Filter "*.whl"
+          $WHEEL_FILE = Get-ChildItem -Path dist -Filter "*.whl" | Select-Object -First 1
+          if ($WHEEL_FILE) {
+            echo "WHEEL_FILENAME=$($WHEEL_FILE.Name)" >> $env:GITHUB_ENV
+            Write-Host "Using wheel file: $($WHEEL_FILE.Name)"
+          } else {
+            Write-Host "ERROR: No wheel file found in dist directory!"
+            exit 1
+          }
+      - name: Install NSIS
+        run: |
+          # Download NSIS installer
+          Invoke-WebRequest -UserAgent "Wget" -Uri "https://sourceforge.net/projects/nsis/files/NSIS%203/3.10/nsis-3.10-setup.exe" -OutFile "nsis.exe"
+          
+          # Install NSIS
+          Start-Process nsis.exe -ArgumentList '/S' -Wait
+          
+          # Add NSIS to PATH
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+      - name: Check for NSIS script
+        run: |
+          $SCRIPT_PATH = "installer/Installer-UX.nsi"
+          if (Test-Path -Path $SCRIPT_PATH) {
+            Write-Host "NSIS script found at $SCRIPT_PATH"
+            Get-Content -Path $SCRIPT_PATH -TotalCount 10  # Show first 10 lines
+          } else {
+            Write-Host "ERROR: NSIS script not found at $SCRIPT_PATH"
+            Write-Host "Current directory: $(Get-Location)"
+            Write-Host "Listing all files in the repository:"
+            Get-ChildItem -Path . -Recurse | Select-Object -ExpandProperty FullName
+          }
+      - name: Build installer
+        run: |
+          echo "Building installer with NSIS..."
+          # Use the full path to the script
+          $SCRIPT_PATH = "$(Get-Location)\installer\Installer-UX.nsi"
+          Write-Host "Using NSIS script at: $SCRIPT_PATH"
+          
+          if (Test-Path -Path $SCRIPT_PATH) {
+            makensis $SCRIPT_PATH
+          } else {
+            Write-Host "ERROR: NSIS script not found at $SCRIPT_PATH"
+            exit 1
+          }
+      - name: Rename installer
+        if: success()
+        run: |
+          if (Test-Path -Path "installer") {
+            $INSTALLER_FILES = Get-ChildItem -Path "installer" -Filter "*.exe" | Where-Object { $_.Name -ne "nsis.exe" }
+            if ($INSTALLER_FILES) {
+              $INSTALLER_PATH = $INSTALLER_FILES[0].FullName
+              Write-Host "Found installer at: $INSTALLER_PATH"
+              $NEW_NAME = "raux-$env:VERSION-setup.exe"
+              $DESTINATION = "installer/$NEW_NAME"
+              Move-Item -Path $INSTALLER_PATH -Destination $DESTINATION -Force
+              echo "INSTALLER_NAME=$NEW_NAME" >> $env:GITHUB_ENV
+            } else {
+              Write-Host "ERROR: No installer .exe files found in installer directory!"
+              exit 1
+            }
+          } else {
+            Write-Host "ERROR: Installer directory not found!"
+            exit 1
+          }
+      - name: Create checksums
+        if: success()
+        run: |
+          # Create SHA256 checksum file
+          $INSTALLER_PATH = "installer/$env:INSTALLER_NAME"
+          $CHECKSUM = (Get-FileHash -Path $INSTALLER_PATH -Algorithm SHA256).Hash.ToLower()
+          $CHECKSUM | Out-File -FilePath "installer/$env:INSTALLER_NAME.sha256" -Encoding ascii
+          Write-Host "Created checksum file with value: $CHECKSUM"
+      - name: Zip installer executable
+        if: success()
+        run: |
+          # First, create a directory to hold all files we want to include in the zip
+          mkdir -p installer/package
+          
+          # Copy the installer executable
+          Copy-Item "installer/$env:INSTALLER_NAME" -Destination "installer/package/"
+          
+          # Copy the .env.example file
+          if (Test-Path -Path ".env.example") {
+            Write-Host "Copying .env.example to package"
+            Copy-Item -Path ".env.example" -Destination "installer/package/"
+          } else {
+            Write-Host "WARNING: .env.example not found in root directory"
+          }
+          
+          # Copy the ux_installer directory with install.py
+          if (Test-Path -Path "installer/ux_installer") {
+            Write-Host "Copying ux_installer directory to package"
+            Copy-Item -Path "installer/ux_installer" -Destination "installer/package/" -Recurse
+          } else {
+            Write-Host "WARNING: ux_installer directory not found in installer directory"
+          }
+          
+          # Copy the launcher raux scripts
+          if (Test-Path -Path "installer/launch_lemonade.ps1") {
+            Write-Host "Copying launch_lemonade.ps1 to package"
+            Copy-Item -Path "installer/launch_lemonade.ps1" -Destination "installer/package/"
+          } else {
+            Write-Host "WARNING: launch_lemonade.ps1 not found in installer directory"
+          }
+            # Copy the launcher lemonade scripts
+          if (Test-Path -Path "installer/launch_raux.ps1") {
+            Write-Host "Copying launch_raux.ps1 to package"
+            Copy-Item -Path "installer/launch_raux.ps1" -Destination "installer/package/"
+          } else {
+            Write-Host "WARNING: launch_raux.ps1 not found in installer directory"
+          }
+          
+          if (Test-Path -Path "installer/launch_raux.cmd") {
+            Write-Host "Copying launch_raux.cmd to package"
+            Copy-Item -Path "installer/launch_raux.cmd" -Destination "installer/package/"
+          } else {
+            Write-Host "WARNING: launch_raux.cmd not found in installer directory"
+          }
+          
+          # Create the zip file with all contents
+          $ZIP_NAME = "raux-$env:VERSION-setup.zip"
+          Compress-Archive -Path "installer/package/*" -DestinationPath "installer/$ZIP_NAME"
+          echo "ZIP_NAME=$ZIP_NAME" >> $env:GITHUB_ENV
+          Write-Host "Created zip file: $ZIP_NAME with installer, .env.example, ux_installer directory, and launcher scripts"
+      - name: Upload installer to GitHub release
+        if: success()
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            installer/${{ env.ZIP_NAME }}
+            installer/${{ env.INSTALLER_NAME }}
+            installer/${{ env.INSTALLER_NAME }}.sha256
+          tag_name: ${{ env.RELEASE_TAG }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
