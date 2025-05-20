@@ -285,7 +285,7 @@ export async function ensurePythonAndPipInstalled() {
     }
 
     // Copy raux.env to python/Lib/.env (always overwrite)
-    await copyEnvToPythonLib();
+    await copyEnvToPythonLib(tmpDir);
     
     // Remove the temp directory after copyEnvToPythonLib
     if (tmpDir) {
@@ -305,18 +305,20 @@ export async function ensurePythonAndPipInstalled() {
 }
 
 // Copy raux.env from Electron resources to python/Lib/.env, always overwriting
-async function copyEnvToPythonLib() {
+async function copyEnvToPythonLib(extractDir: string) {
   try {
-    // Electron's resourcesPath is available via process.resourcesPath
-    // In dev mode, fallback to getAppInstallDir()/resources
-    const isPackaged = !!process.resourcesPath;
-    const resourcesDir = isPackaged
-      ? process.resourcesPath
-      : join(getAppInstallDir(), 'resources');
-    const srcEnv = join(resourcesDir, 'raux.env');
+    if (process.platform !== 'win32') {
+      logError('copyEnvToPythonLib: Only supported on Windows.');
+      return;
+    }
+    const pathEnv = process.env.PATH || '';
+    const userProfile = process.env.USERPROFILE || '';
+    const hasLemonade = pathEnv.includes('lemonade_server') || userProfile.includes('lemonade_server');
+    const envFileName = hasLemonade ? 'raux-hybrid.env' : 'raux-generic.env';
+    const srcEnv = join(extractDir, envFileName);
     const destEnv = join(PYTHON_DIR, 'Lib', '.env');
     if (!existsSync(srcEnv)) {
-      logError(`copyEnvToPythonLib: Source raux.env not found at ${srcEnv}`);
+      logError(`copyEnvToPythonLib: Source ${envFileName} not found at ${srcEnv}`);
       return;
     }
     // Ensure Lib directory exists
@@ -324,10 +326,9 @@ async function copyEnvToPythonLib() {
     if (!existsSync(libDir)) {
       mkdirSync(libDir, { recursive: true });
     }
-    // Copy and overwrite
     const fs = await import('fs');
     fs.copyFileSync(srcEnv, destEnv);
-    logInfo(`Copied raux.env to ${destEnv}`);
+    logInfo(`Copied ${envFileName} to ${destEnv}`);
   } catch (err) {
     logError(`copyEnvToPythonLib failed: ${err}`);
   }
