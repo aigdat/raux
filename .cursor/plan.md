@@ -17,17 +17,17 @@
 - [x] Create `raux-hybrid.env` based on current `raux.env` (keeping `OPENAI_API_BASE_URLS` line)
 
 ### 2. Modify GitHub Action Workflow
-- [ ] Duplicate the existing `package-windows` job to create:
+- [x] Duplicate the existing `package-windows` job to create:
   - `package-generic` job
   - `package-hybrid` job
-- [ ] Modify the "Setup RAUX Environment" step in each job:
+- [x] Modify the "Setup RAUX Environment" step in each job:
   - In `package-generic`: copy `raux-generic.env` to `.env`
   - In `package-hybrid`: copy `raux-hybrid.env` to `.env`
-- [ ] Update the "Rename installer to raux-setup.exe" section name to "Rename installer"
+- [x] Update the "Rename installer to raux-setup.exe" section name to "Rename installer"
   - In the "hybrid" version, it will create an "exe" named "raux-hybrid-setup.exe"
   - In the "generic" version, it will create an "exe" named "raux-generic-setup.exe"
-- [ ] Add appropriate output artifact naming to distinguish between builds
-- [ ] Update any dependencies between jobs as necessary
+- [x] Add appropriate output artifact naming to distinguish between builds
+- [x] Update any dependencies between jobs as necessary
 
 ### 3. Testing
 - [ ] Validate workflow runs successfully
