@@ -165,10 +165,16 @@ jobs:
         with:
           name: windows-electron-raw-installer
 
-      - name: Download build context
+      - name: Download build context am 
         uses: actions/download-artifact@v4
         with:
           name: raux-wheel
+
+      - name: List files in current directory
+        run: |
+          pwd
+          ls -al
+          ls -al backend || echo "No backend directory found"
 
       - name: Setup RAUX Environment (generic)
         run: |
@@ -212,6 +218,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: raux-wheel
+
+      - name: List files in current directory
+        run: |
+          pwd
+          ls -al
+          ls -al backend || echo "No backend directory found"
 
       - name: Setup RAUX Environment (hybrid)
         run: |
