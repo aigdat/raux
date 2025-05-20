@@ -168,7 +168,7 @@ jobs:
       - name: Download build context
         uses: actions/download-artifact@v4
         with:
-          name: build-context
+          name: raux-wheel
 
       - name: Setup RAUX Environment (generic)
         run: |
@@ -211,7 +211,7 @@ jobs:
       - name: Download build context
         uses: actions/download-artifact@v4
         with:
-          name: build-context
+          name: raux-wheel
 
       - name: Setup RAUX Environment (hybrid)
         run: |
