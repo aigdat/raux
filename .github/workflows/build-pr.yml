@@ -1,48 +1,90 @@
 name: Build and package solution (pr)
 
 on:
-  push:
-    tags:
-      - 'v*'
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., 0.1.0)'
-        required: true
-        default: ''
 
 jobs:
-  extract-version:
+  build-preparation:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.get-version.outputs.version }}
-      cleaned_version: ${{ steps.clean-version.outputs.version }}
+      production_version: ${{ steps.get-production-version.outputs.version }}
+      electron_version: ${{ steps.get-electron-version.outputs.version }}
+      raux_version: ${{ steps.get-raux-version.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set version from tag or input
-        id: get-version
+      - name: Get production version from RAUX/package.json
+        id: get-production-version
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="${{ github.ref_name }}"
-            # Remove 'v' prefix if present
-            VERSION="${VERSION#v}"
-          fi
+          VERSION=$(jq -r .version package.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get electron version from RAUX/raux-electron/package.json
+        id: get-electron-version
+        run: |
+          VERSION=$(jq -r .version raux-electron/package.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       
-      - name: Clean version string
-        id: clean-version
+      - name: Get RAUX version from RAUX/raux-electron/package.json
+        id: get-raux-version
         run: |
-          # Remove any non-numeric/dot characters for use in file names
-          CLEAN_VERSION=$(echo "${{ steps.get-version.outputs.version }}" | sed 's/[^0-9\.]//g')
-          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          VERSION=$(jq -r '."raux-version"' raux-electron/package.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using RAUX version: $VERSION for wheel building"
+
+  build-wheel:
+    needs: build-preparation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
       
+      - name: Install wheel building dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install wheel setuptools build
+
+      - name: Build wheel
+        run: |
+          python -m build --wheel
+
+      - name: Rename wheel to raux.whl
+        run: |
+          mv dist/*.whl dist/raux.whl
+
+      - name: Prepare build context for zipping
+        run: |
+          mkdir build-context
+          cp dist/raux.whl build-context/
+          cp raux-hybrid.env build-context/
+          cp raux-generic.env build-context/
+
+      - name: Create build context zip
+        run: |
+          cd build-context
+          zip -r ../raux-wheel-context.zip .
+
+      - name: Upload build context zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: raux-wheel-context
+          path: raux-wheel-context.zip
+          retention-days: 7
+
   build-electron:
-    needs: extract-version
-    runs-on: windows-latest
+    needs: [build-preparation, build-wheel]
+    runs-on: ubuntu-latest
+    outputs:
+      changelog_notes: ${{ steps.changelog.outputs.notes }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,76 +92,96 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: 'raux-electron/package-lock.json'
 
       - name: Extract CHANGELOG entry
         id: changelog
         run: |
-          $pattern = "## [v${{ needs.extract-version.outputs.version }}]"
-          $content = Get-Content CHANGELOG.md -Raw
-          $regex = "(?s)$pattern(.*?)(?=\n## \[v|$)"
-          $match = [regex]::Match($content, $regex)
-          if ($match.Success) {
-              $notes = $match.Groups[1].Value.Trim()
-              # Convert notes to a format that can be passed in the GitHub environment
-              $notes = $notes -replace "`n", "%0A"
-              echo "notes=$notes" >> $env:GITHUB_OUTPUT
-          } else {
-              echo "notes=Release v${{ needs.extract-version.outputs.version }}%0ANo release notes available." >> $env:GITHUB_OUTPUT
-          }
+          pattern="## [v${{ needs.build-preparation.outputs.production_version }}]"
+          content=$(cat CHANGELOG.md)
+          regex="(?s)$pattern(.*?)(?=\n## \[v|$)"
+          notes=$(echo "$content" | perl -0777 -ne "print \$1 if /$regex/")
+          if [ -z "$notes" ]; then
+            notes="Release v${{ needs.build-preparation.outputs.production_version }}%0ANo release notes available."
+          fi
+          notes="${notes//$'\n'/%0A}"
+          echo "notes=$notes" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
         run: |
           cd raux-electron
           npm ci
 
-      - name: Update version in package.json
+      - name: Update production version in root package.json
+        run: |
+          jq '.version = "${{ needs.build-preparation.outputs.production_version }}"' package.json > package.json.tmp && mv package.json.tmp package.json
+          echo "Updated root package.json version to ${{ needs.build-preparation.outputs.production_version }}"
+
+      - name: Update electron version in raux-electron/package.json
         run: |
           cd raux-electron
-          $packageJson = Get-Content -Path package.json -Raw | ConvertFrom-Json
-          $packageJson.version = "${{ needs.extract-version.outputs.version }}"
-          $packageJson | ConvertTo-Json -Depth 100 | Set-Content -Path package.json
-          echo "Updated package.json version to ${{ needs.extract-version.outputs.version }}"
+          jq '.version = "${{ needs.build-preparation.outputs.electron_version }}"' package.json > package.json.tmp && mv package.json.tmp package.json
+          echo "Updated raux-electron/package.json version to ${{ needs.build-preparation.outputs.electron_version }}"
 
-      - name: Build Electron app
+      - name: Upload build context
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-context
+          path: |
+            raux-electron
+            backend
+            CHANGELOG.md
+            package.json
+
+  package-electron:
+    needs: [build-preparation, build-electron]
+    runs-on: windows-latest
+    steps:
+      - name: Download build context
+        uses: actions/download-artifact@v4
+        with:
+          name: build-context
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: 'raux-electron/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd raux-electron
+          npm ci
+
+      - name: Build Electron app (Windows)
         run: |
           cd raux-electron
           npm run make
 
-      - name: Find generated files
-        id: find-files
+      - name: Rename installer to raux-setup.exe
         run: |
-          # Find NSIS installer
-          $INSTALLER = Get-ChildItem -Path "raux-electron\out\make\squirrel.windows\x64\*.exe" -Recurse | Select-Object -First 1
-          if ($INSTALLER) {
-            echo "installer_path=$($INSTALLER.FullName)" >> $env:GITHUB_OUTPUT
-            echo "installer_name=$($INSTALLER.Name)" >> $env:GITHUB_OUTPUT
-            echo "Found installer: $($INSTALLER.FullName)"
-          } else {
-            echo "Error: No installer found!"
-            exit 1
-          }
-
-          # Find zip file if available
-          $ZIP = Get-ChildItem -Path "raux-electron\out\make\zip\win32\x64\*.zip" -Recurse | Select-Object -First 1
-          if ($ZIP) {
-            echo "zip_path=$($ZIP.FullName)" >> $env:GITHUB_OUTPUT
-            echo "zip_name=$($ZIP.Name)" >> $env:GITHUB_OUTPUT
-            echo "Found zip: $($ZIP.FullName)"
-          }
-
+          mv raux-electron/out/make/squirrel.windows/x64/*.exe raux-electron/out/make/squirrel.windows/x64/raux-setup.exe
+  
       - name: Create SHA256 checksum
         run: |
-          $INSTALLER_PATH = "${{ steps.find-files.outputs.installer_path }}"
+          $INSTALLER_PATH = "raux-electron/out/make/squirrel.windows/x64/raux-setup.exe"
           $CHECKSUM = (Get-FileHash -Path $INSTALLER_PATH -Algorithm SHA256).Hash.ToLower()
           $CHECKSUM | Out-File -FilePath "$INSTALLER_PATH.sha256" -Encoding ascii
           echo "Created checksum for installer: $CHECKSUM"
 
-      - name: Upload additional build artifacts
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
-          path: raux-electron/out/
+          name: raux-setup.exe
+          path: raux-electron/out/make/squirrel.windows/x64/raux-setup.exe
+          retention-days: 7
+
+      - name: Upload checksum artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: raux-setup.exe.sha256
+          path: raux-electron/out/make/squirrel.windows/x64/raux-setup.exe.sha256
           retention-days: 7
