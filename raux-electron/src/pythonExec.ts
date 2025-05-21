@@ -31,9 +31,6 @@ class PythonExec {
       logInfo('Python directory already exists, skipping installation.');
       return;
     }
-    if (existsSync(PYTHON_DIR)) {
-      rmSync(PYTHON_DIR, { recursive: true, force: true });
-    }
     mkdirSync(PYTHON_DIR, { recursive: true });
     const url = this.getPythonDownloadUrl();
     const zipPath = join(PYTHON_DIR, 'python-embed.zip');
