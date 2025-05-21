@@ -1,9 +1,11 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, app } from 'electron';
 import { join } from 'path';
 import { IPCManager } from './ipc/ipcManager';
+import { getRendererPath } from './envUtils';
 
 const RAUX_URL = 'http://localhost:8080';
-const LOADING_PAGE = join(__dirname, 'pages', 'loading.html');
+const LOADING_PAGE = getRendererPath('pages', 'loading', 'loading.html');
+const PRELOAD_SCRIPT = getRendererPath('main_window', 'preload.js');
 
 export class WindowManager {
   private static instance: WindowManager;
@@ -24,7 +26,7 @@ export class WindowManager {
       height: 600,
       width: 800,
       webPreferences: {
-        preload: join(__dirname, 'preload.js'),
+        preload: PRELOAD_SCRIPT,
         contextIsolation: true,
         nodeIntegration: false,
       },

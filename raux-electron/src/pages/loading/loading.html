@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loading...</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: sans-serif;
+      background: #f8f9fa;
+    }
+    .spinner {
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #3498db;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 24px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading {
+      font-size: 2rem;
+      color: #333;
+      margin-bottom: 16px;
+    }
+    #status-messages {
+      width: 400px;
+      max-width: 90vw;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      padding: 16px;
+      font-size: 1rem;
+      color: #222;
+      margin-top: 8px;
+      min-height: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <div class="loading">Loading...</div>
+  <div id="status-messages"></div>
+  <script src="loading.js"></script>
+</body>
+</html> 
