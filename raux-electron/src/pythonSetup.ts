@@ -165,12 +165,12 @@ async function downloadRAUXWheel(): Promise<string> {
   // Construct URL for the zip file
   let zipUrl: string;
   if (rauxVersion === 'latest') {
-    zipUrl = process.env.RAUX_WHEEL_URL || 'https://github.com/aigdat/raux/releases/latest/download/raux-build-context.zip';
+    zipUrl = process.env.RAUX_WHEEL_URL || 'https://github.com/aigdat/raux/releases/latest/download/raux-wheel-context.zip';
   } else {
     // Remove the 'v' prefix if present for consistent URL formatting
     const versionStr = rauxVersion.startsWith('v') ? rauxVersion.substring(1) : rauxVersion;
     zipUrl = process.env.RAUX_WHEEL_URL || 
-             `https://github.com/aigdat/raux/releases/download/v${versionStr}/raux-build-context.zip`;
+             `https://github.com/aigdat/raux/releases/download/v${versionStr}/raux-wheel-context.zip`;
   }
 
   logInfo(`Downloading build context zip from URL: ${zipUrl}`);
