@@ -218,39 +218,37 @@ async function downloadRAUXWheel(): Promise<string> {
 }
 
 async function installRAUXWheel(extractDir: string): Promise<void> {
-  logInfo(`Installing RAUX wheel from directory: ${extractDir}...`);
+  logInfo(`Installing RAUX wheel(s) from directory: ${extractDir}...`);
   const fs = await import('fs');
   const path = await import('path');
-  const whlFile = fs.readdirSync(extractDir).find(f => f === 'raux.whl');
-  if (!whlFile) {
-    logError('No raux.whl file found in extracted build context.');
-    throw new Error('No raux.whl file found in extracted build context.');
+  const whlFiles = fs.readdirSync(extractDir).filter(f => f.endsWith('.whl'));
+  if (whlFiles.length === 0) {
+    logError('No .whl files found in extracted build context.');
+    throw new Error('No .whl files found in extracted build context.');
   }
-  const wheelPath = path.join(extractDir, whlFile);
-
-  return new Promise<void>((resolve, reject) => {
-    const proc = spawn(PYTHON_EXE, ['-m', 'pip', 'install', wheelPath, '--verbose', '--no-warn-script-location'], {
-      stdio: 'pipe'
+  for (const whlFile of whlFiles) {
+    const wheelPath = path.join(extractDir, whlFile);
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn(PYTHON_EXE, ['-m', 'pip', 'install', wheelPath, '--verbose', '--no-warn-script-location'], {
+        stdio: 'pipe'
+      });
+      proc.stdout.on('data', (data) => logInfo(`[wheel-install][stdout] ${data}`));
+      proc.stderr.on('data', (data) => logError(`[wheel-install][stderr] ${data}`));
+      proc.on('close', (code) => {
+        if (code === 0) {
+          logInfo(`${whlFile} installed successfully.`);
+          resolve();
+        } else {
+          logError(`Failed to install ${whlFile}. Exit code: ${code}`);
+          reject(new Error(`Failed to install ${whlFile}. Exit code: ${code}`));
+        }
+      });
+      proc.on('error', (err) => {
+        logError(`Wheel installation process error: ${err}`);
+        reject(err);
+      });
     });
-
-    proc.stdout.on('data', (data) => logInfo(`[wheel-install][stdout] ${data}`));
-    proc.stderr.on('data', (data) => logError(`[wheel-install][stderr] ${data}`));
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        logInfo('RAUX wheel installed successfully.');
-        resolve();
-      } else {
-        logError(`Failed to install RAUX wheel. Exit code: ${code}`);
-        reject(new Error(`Failed to install RAUX wheel. Exit code: ${code}`));
-      }
-    });
-
-    proc.on('error', (err) => {
-      logError(`Wheel installation process error: ${err}`);
-      reject(err);
-    });
-  });
+  }
 }
 
 export async function ensurePythonAndPipInstalled() {

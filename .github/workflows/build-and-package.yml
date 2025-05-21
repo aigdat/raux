@@ -64,14 +64,10 @@ jobs:
         run: |
           python -m build --wheel
 
-      - name: Rename wheel to raux.whl
-        run: |
-          mv dist/*.whl dist/raux.whl
-
       - name: Prepare build context for zipping
         run: |
           mkdir build-context
-          cp dist/raux.whl build-context/
+          cp dist/*.whl build-context/
           cp raux-hybrid.env build-context/
           cp raux-generic.env build-context/
 
