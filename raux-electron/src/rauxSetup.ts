@@ -8,6 +8,8 @@ import { logInfo, logError } from './logger';
 
 class RauxSetup {
   private static instance: RauxSetup;
+  private static readonly RAUX_HYBRID_ENV = 'raux-hybrid.env';
+  private static readonly RAUX_GENERIC_ENV = 'raux-generic.env';
   private constructor() {}
 
   public static getInstance(): RauxSetup {
@@ -119,15 +121,15 @@ class RauxSetup {
       let envFileName: string;
       if (gaiaMode !== undefined) {
         if (gaiaMode === 'HYBRID') {
-          envFileName = 'raux-hybrid.env';
+          envFileName = RauxSetup.RAUX_HYBRID_ENV;
         } else {
-          envFileName = 'raux-generic.env';
+          envFileName = RauxSetup.RAUX_GENERIC_ENV;
         }
       } else {
         const pathEnv = process.env.PATH || '';
         const userProfile = process.env.USERPROFILE || '';
         const hasLemonade = pathEnv.includes('lemonade_server') || userProfile.includes('lemonade_server');
-        envFileName = hasLemonade ? 'raux-hybrid.env' : 'raux-generic.env';
+        envFileName = hasLemonade ? RauxSetup.RAUX_HYBRID_ENV : RauxSetup.RAUX_GENERIC_ENV;
       }
       const srcEnv = join(extractDir, envFileName);
       const destEnv = join(getAppInstallDir(), 'python', 'Lib', '.env');
