@@ -166,6 +166,7 @@ jobs:
       - name: Build Electron app (Windows)
         run: |
           cd raux-electron
+          $env:RAUX_VERSION = '${{ needs.build-preparation.outputs.production_version }}'
           npm run make
 
       - name: Rename installer to raux-setup.exe
