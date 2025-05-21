@@ -309,21 +309,37 @@ async function copyEnvToPythonLib(extractDir: string) {
       logError('copyEnvToPythonLib: Only supported on Windows.');
       return;
     }
-    const pathEnv = process.env.PATH || '';
-    const userProfile = process.env.USERPROFILE || '';
-    const hasLemonade = pathEnv.includes('lemonade_server') || userProfile.includes('lemonade_server');
-    const envFileName = hasLemonade ? 'raux-hybrid.env' : 'raux-generic.env';
+    // Check GAIA_MODE first
+    const gaiaMode = process.env.GAIA_MODE;
+    let envFileName: string;
+    
+    if (gaiaMode !== undefined) {
+      if (gaiaMode === 'HYBRID') {
+        envFileName = 'raux-hybrid.env';
+      } else {
+        envFileName = 'raux-generic.env';
+      }
+    } else {
+      // Fallback to lemonade_server path-based check
+      const pathEnv = process.env.PATH || '';
+      const userProfile = process.env.USERPROFILE || '';
+      const hasLemonade = pathEnv.includes('lemonade_server') || userProfile.includes('lemonade_server');
+      envFileName = hasLemonade ? 'raux-hybrid.env' : 'raux-generic.env';
+    }
+
     const srcEnv = join(extractDir, envFileName);
     const destEnv = join(PYTHON_DIR, 'Lib', '.env');
     if (!existsSync(srcEnv)) {
       logError(`copyEnvToPythonLib: Source ${envFileName} not found at ${srcEnv}`);
       return;
     }
+
     // Ensure Lib directory exists
     const libDir = join(PYTHON_DIR, 'Lib');
     if (!existsSync(libDir)) {
       mkdirSync(libDir, { recursive: true });
     }
+
     const fs = await import('fs');
     fs.copyFileSync(srcEnv, destEnv);
     logInfo(`Copied ${envFileName} to ${destEnv}`);
