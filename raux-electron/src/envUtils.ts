@@ -1,5 +1,5 @@
 import { app } from 'electron';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import os from 'os';
 
 export const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === '1';
@@ -34,7 +34,7 @@ export function getBackendDir() {
     return join(__dirname, '../../../backend');
   }
   // Use the resources directory of the running app version
-  return require('path').dirname(app.getAppPath());
+  return dirname(app.getAppPath());
 }
 
 // Python executable path
