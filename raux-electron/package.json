@@ -2,7 +2,7 @@
   "name": "raux",
   "productName": "raux",
   "version": "0.2.0",
-  "raux-version": "v0.6.5+raux.0.1.0",
+  "raux-version": "0.6.5+raux.0.2.0",
   "description": "My Electron application description",
   "main": ".webpack/main",
   "scripts": {
