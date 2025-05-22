@@ -1,6 +1,6 @@
 import { app } from 'electron';
 import { logInfo, logError } from './logger';
-import { getAppInstallDir, isDev } from './envUtils';
+import { getAppInstallDir } from './envUtils';
 import { handleSquirrelEvent } from './squirrelEvents';
 import { rauxProcessManager } from './rauxProcessManager';
 import { setTimeout } from 'timers';
@@ -25,7 +25,6 @@ if (handleSquirrelEvent()) {
   process.exit(0);
 }
 
-logInfo(`Current Environment: ${isDev ? 'Development' : 'Production'}`);
 logInfo(`Install dir: ${getAppInstallDir()}`);
 logInfo(`RAUX Version: ${process.env.RAUX_VERSION || 'latest'}`);
 
@@ -64,12 +63,13 @@ const runInstallationAndBackend = async () => {
 const pollBackend = () => {
   fetch(RAUX_URL)
     .then(() => {
-      ipcManager.sendToAll(IPCChannels.INSTALLATION_COMPLETE, { type: 'success', message: 'Backend ready.' });
+      ipcManager.sendToAll(IPCChannels.INSTALLATION_COMPLETE, { type: 'success', message: 'GAIA is ready.' });
+      ipcManager.sendToAll(IPCChannels.INSTALLATION_COMPLETE, { type: 'success', message: 'Launching GAIA...' });
       windowManager.showMainApp();
     })
     .catch(() => {
       if (rauxProcessManager.getStatus() === 'crashed') {
-        windowManager.showErrorPage('RAUX failed to start');
+        windowManager.showErrorPage('GAIA failed to start');
       } else {
         setTimeout(pollBackend, 1000);
       }
