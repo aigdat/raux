@@ -23,8 +23,8 @@ export class WindowManager {
 
   public createMainWindow(): void {
     this.mainWindow = new BrowserWindow({
-      height: 600,
-      width: 800,
+      height: 1024,
+      width: 1280,
       webPreferences: {
         preload: PRELOAD_SCRIPT,
         contextIsolation: true,
@@ -32,6 +32,7 @@ export class WindowManager {
       },
       show: true,
     });
+    this.mainWindow.setMenuBarVisibility(false);
     this.mainWindow.loadFile(LOADING_PAGE);
     this.ipcManager.registerRenderer(this.mainWindow.webContents.id, this.mainWindow.webContents);
   }

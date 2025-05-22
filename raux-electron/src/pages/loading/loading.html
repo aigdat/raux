@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -14,44 +15,158 @@
       height: 100vh;
       margin: 0;
       font-family: sans-serif;
-      background: #f8f9fa;
+      background: #18181b;
     }
+
     .spinner {
-      border: 8px solid #f3f3f3;
-      border-top: 8px solid #3498db;
+      border: 8px solid #23232a;
+      border-top: 8px solid #aaa;
       border-radius: 50%;
       width: 60px;
       height: 60px;
       animation: spin 1s linear infinite;
       margin-bottom: 24px;
     }
+
     @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
     }
+
     .loading {
       font-size: 2rem;
-      color: #333;
+      color: #f3f4f6;
       margin-bottom: 16px;
     }
-    #status-messages {
+
+    .loading-layout {
+      position: relative;
+      width: 500px;
+      height: 400px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gaia-image {
+      position: absolute;
+      left: 65%;
+      top: 50%;
+      transform: translate(-40%, -50%);
       width: 400px;
+      z-index: 3;
+      pointer-events: none;
+      opacity: 1;
+    }
+
+    #status-messages {
+      position: absolute;
+      left: -10%;
+      top: 50%;
+      transform: translateY(-50%) translateX(-30px);
+      width: 320px;
       max-width: 90vw;
-      background: #fff;
+      background: #23232a;
       border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
       padding: 16px;
-      font-size: 1rem;
-      color: #222;
-      margin-top: 8px;
+      font-size: 0.75rem;
+      color: #e5e7eb;
       min-height: 40px;
+      font-family: 'Consolas', 'Menlo', 'Monaco', 'Liberation Mono', 'Courier New', monospace;
+      height: 270px;
+      overflow-y: auto;
+      z-index: 1;
+      opacity: 0.95;
+    }
+
+    #status-messages div {
+      margin-bottom: 6px;
+    }
+
+    #status-messages::-webkit-scrollbar {
+      display: none;
+    }
+
+    .progress-bar-container {
+      position: absolute;
+      left: -10%;
+      top: 90%;
+      width: 290px;
+      height: 8px;
+      background: transparent;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: linear-gradient(90deg, #a3e635 0%, #38bdf8 100%);
+      border-radius: 4px;
+      animation: progress-indeterminate 1.2s linear infinite;
+      background-size: 200% 100%;
+      background-position: 100% 0;
+    }
+
+    @keyframes progress-indeterminate {
+      0% {
+        background-position: 100% 0;
+      }
+
+      100% {
+        background-position: 0 0;
+      }
     }
   </style>
 </head>
+
 <body>
-  <div class="spinner"></div>
-  <div class="loading">Loading...</div>
-  <div id="status-messages"></div>
+  <div class="loading-layout">
+    <!-- <div id="status-messages"></div> -->
+    <div id="status-messages">
+      <div>Installing Python...</div>
+      <div>Checking Python installation...</div>
+      <div>Downloading Python...</div>
+      <div>Python download finished.</div>
+      <div>Extracting Python...</div>
+      <div>Python extraction finished.</div>
+      <div>Installing pip...</div>
+      <div>get-pip.py download finished.</div>
+      <div>pip installed successfully.</div>
+      <div>Python and pip setup completed.</div>
+      <div>Installing RAUX...</div>
+      <div>Downloading RAUX wheel...</div>
+      <div>RAUX wheel download finished.</div>
+      <div>RAUX wheel extraction finished.</div>
+      <div>Installing RAUX wheel...</div>
+    </div>
+    <img src="../../../static/gaia.png" alt="GAIA" class="gaia-image" />
+    <div class="progress-bar-container">
+      <div class="progress-bar"></div>
+    </div>
+  </div>
   <script src="loading.js"></script>
+  <script>
+    // Auto-scroll to bottom on load and when content changes
+    const statusBox = document.getElementById('status-messages');
+    function scrollToBottom() {
+      statusBox.scrollTop = statusBox.scrollHeight;
+    }
+    // Initial scroll
+    scrollToBottom();
+    // Observe for changes
+    const observer = new MutationObserver(scrollToBottom);
+    observer.observe(statusBox, { childList: true, subtree: true });
+  </script>
 </body>
-</html> 
+
+</html>

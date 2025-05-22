@@ -7,12 +7,16 @@ const messages = [];
 // Helper to render all messages
 function renderMessages() {
   statusDiv.innerHTML = messages.map(msg => {
-    let color = '#222';
-    if (msg.type === 'error') color = '#c0392b';
-    if (msg.type === 'success') color = '#27ae60';
-    if (msg.type === 'info') color = '#2980b9';
-    if (msg.type === 'progress') color = '#f39c12';
-    return `<div style="margin-bottom:6px;color:${color}">${msg.message}</div>`;
+
+    if (msg.type === 'error') {
+      return `<div style="color:#c0392b">${msg.message}</div>`;
+    }
+
+    // if (msg.type === 'success') color = '#27ae60';
+    // if (msg.type === 'info') color = '#2980b9';
+    // if (msg.type === 'progress') color = '#f39c12';
+
+    return `<div>${msg.message}</div>`;
   }).join('');
 }
 
