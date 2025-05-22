@@ -31,11 +31,11 @@ class PythonExec {
 
   public async install(): Promise<void> {
     try {
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Checking Python installation...', step: 'python-check' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Checking Python environment ...', step: 'python-check' });
       
       if (existsSync(PYTHON_DIR)) {
         logInfo('Python directory already exists, skipping installation.');
-        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Python already installed.', step: 'python-check' });
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Python environment configure.', step: 'python-check' });
       
         return;
       }
@@ -45,20 +45,20 @@ class PythonExec {
       const url = this.getPythonDownloadUrl();
       const zipPath = join(PYTHON_DIR, 'python-embed.zip');
 
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Downloading Python...', step: 'python-download' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Pre-checking environment variables...', step: 'python-download' });
       await this.downloadPython(url, zipPath);
       
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Extracting Python...', step: 'python-extract' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Extracting intenral libraries...', step: 'python-extract' });
       await this.extractPython(zipPath, PYTHON_DIR);
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installing pip...', step: 'pip-install' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Configuring dependencies...', step: 'pip-install' });
       
       await this.ensurePipInstalled();
 
       logInfo('Python and pip setup completed successfully.');
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Python and pip setup completed.', step: 'python-complete' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Environment setup completed.', step: 'python-complete' });
     } catch (err) {
       logError('Python installation failed: ' + (err && err.toString ? err.toString() : String(err)));
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Python installation failed. Check logs.', step: 'python-error' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Environment config failed!', step: 'python-error' });
       throw err;
     }
   }
@@ -91,7 +91,7 @@ class PythonExec {
         .then(response => {
           if (response.status !== 200) {
             logError('Failed to download Python: ' + response.status);
-            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to download Python.', step: 'python-download' });
+            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Environment not configurable.', step: 'python-download' });
             reject(new Error('Failed to download Python: ' + response.status));
             return;
           }
@@ -100,13 +100,13 @@ class PythonExec {
           file.on('finish', () => {
             file.close();
             logInfo('Python download finished.');
-            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Python download finished.', step: 'python-download' });
+            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Environment download completed.', step: 'python-download' });
             resolve();
           });
         })
         .catch(err => {
           logError(`Download error: ${err}`);
-          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Python download error.', step: 'python-download' });
+          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Environment download error.', step: 'python-download' });
           reject(err);
         });
     });
@@ -117,10 +117,10 @@ class PythonExec {
     try {
       await extract(zipPath, { dir: destDir });
       logInfo('Python extraction finished.');
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Python extraction finished.', step: 'python-extract' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Environment extraction finished.', step: 'python-extract' });
     } catch (error) {
       logError(`Failed to extract Python: ${error}`);
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to extract Python.', step: 'python-extract' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to extract environment.', step: 'python-extract' });
       throw error;
     }
   }
@@ -129,13 +129,16 @@ class PythonExec {
     logInfo('Ensuring pip is installed using get-pip.py...');
     const getPipUrl = 'https://bootstrap.pypa.io/get-pip.py';
     const getPipPath = join(PYTHON_DIR, 'get-pip.py');
+
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Preparing packaging resource...', step: 'pip-download' });
+
     // Download get-pip.py
     await new Promise<void>((resolve, reject) => {
       fetch(getPipUrl)
         .then(response => {
           if (response.status !== 200) {
             logError('Failed to download get-pip.py: ' + response.status);
-            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to download get-pip.py.', step: 'pip-download' });
+            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to download packaging resource!', step: 'pip-download' });
             reject(new Error('Failed to download get-pip.py: ' + response.status));
             return;
           }
@@ -144,13 +147,13 @@ class PythonExec {
           file.on('finish', () => {
             file.close();
             logInfo('get-pip.py download finished.');
-            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'get-pip.py download finished.', step: 'pip-download' });
+            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Packaging resource download finished.', step: 'pip-download' });
             resolve();
           });
         })
         .catch(err => {
           logError(`Download error (get-pip.py): ${err}`);
-          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'get-pip.py download error.', step: 'pip-download' });
+          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Packaging resource download error!', step: 'pip-download' });
           reject(err);
         });
     });
@@ -162,17 +165,17 @@ class PythonExec {
       proc.on('close', (code) => {
         if (code === 0) {
           logInfo('pip installed successfully via get-pip.py.');
-          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'pip installed successfully.', step: 'pip-install' });
+          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Packaging resource install success.', step: 'pip-install' });
           resolve();
         } else {
           logError('get-pip.py failed');
-          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'get-pip.py failed.', step: 'pip-install' });
+          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Packaging resource failed!', step: 'pip-install' });
           reject(new Error('get-pip.py failed'));
         }
       });
       proc.on('error', (err) => {
         logError(`get-pip.py process error: ${err}`);
-        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'get-pip.py process error.', step: 'pip-install' });
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Packaging resource process error.', step: 'pip-install' });
         reject(err);
       });
     });

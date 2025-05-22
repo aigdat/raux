@@ -25,11 +25,11 @@ class RauxSetup {
   public async install(): Promise<void> {
     let tmpDir: string | null = null;
     try {
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Downloading RAUX wheel...', step: 'raux-download' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Downloading GAIA environment...', step: 'raux-download' });
       tmpDir = await this.downloadRAUXWheel();
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installing RAUX wheel...', step: 'raux-install' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installing GAIA environment...', step: 'raux-install' });
       await this.installRAUXWheel(tmpDir);
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Copying environment file...', step: 'raux-env' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Ensuring GAIA environment configuration...', step: 'raux-env' });
       await this.copyEnvToPythonLib(tmpDir);
       if (tmpDir) {
         try {
@@ -40,10 +40,10 @@ class RauxSetup {
         }
       }
       logInfo('RAUX wheel and env setup completed successfully.');
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'RAUX wheel and env setup completed.', step: 'raux-complete' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'GAIA environment setup completed.', step: 'raux-complete' });
     } catch (err) {
       logError(`RAUX wheel installation failed: ${err}`);
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'RAUX installation failed. Check logs.', step: 'raux-error' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'GAIA installation failed, check logs!', step: 'raux-error' });
       throw err;
     }
   }
@@ -71,7 +71,7 @@ class RauxSetup {
         .then(response => {
           if (response.status !== 200) {
             logError('Failed to download build context zip: ' + response.status);
-            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to download RAUX wheel.', step: 'raux-download' });
+            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to download GAIA environment.', step: 'raux-download' });
             reject(new Error('Failed to download build context zip: ' + response.status));
             return;
           }
@@ -80,13 +80,13 @@ class RauxSetup {
           file.on('finish', () => {
             file.close();
             logInfo('Build context zip download finished.');
-            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'RAUX wheel download finished.', step: 'raux-download' });
+            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'GAIA environment download finished.', step: 'raux-download' });
             resolve();
           });
         })
         .catch(err => {
           logError(`Build context zip download error: ${err}`);
-          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'RAUX wheel download error.', step: 'raux-download' });
+          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'GAIA environment download error.', step: 'raux-download' });
           reject(err);
         });
     });
@@ -94,10 +94,10 @@ class RauxSetup {
     try {
       await extract(zipPath, { dir: tmpDir });
       logInfo('Build context extraction finished.');
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'RAUX wheel extraction finished.', step: 'raux-extract' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'GAIA environment extraction finished.', step: 'raux-extract' });
     } catch (error) {
       logError(`Failed to extract build context zip: ${error}`);
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to extract RAUX wheel.', step: 'raux-extract' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to extract GAIA environment.', step: 'raux-extract' });
       throw error;
     }
     return tmpDir;
@@ -110,7 +110,7 @@ class RauxSetup {
     const whlFiles = fs.readdirSync(extractDir).filter((f: string) => f.endsWith('.whl'));
     if (whlFiles.length === 0) {
       logError('No .whl files found in extracted build context.');
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'No .whl files found in RAUX wheel.', step: 'raux-install' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'No GAIA environment found.', step: 'raux-install' });
       throw new Error('No .whl files found in extracted build context.');
     }
     for (const whlFile of whlFiles) {
@@ -118,10 +118,10 @@ class RauxSetup {
       const result = await python.runPipCommand(['install', wheelPath, '--verbose', '--no-warn-script-location']);
       if (result.code === 0) {
         logInfo(`${whlFile} installed successfully.`);
-        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: `${whlFile} installed successfully.`, step: 'raux-install' });
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'GAIA environment installed successfully.', step: 'raux-install' });
       } else {
         logError(`Failed to install ${whlFile}. Exit code: ${result.code}`);
-        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: `Failed to install ${whlFile}.`, step: 'raux-install' });
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to install GAIA environment.', step: 'raux-install' });
         throw new Error(`Failed to install ${whlFile}. Exit code: ${result.code}`);
       }
     }
@@ -131,7 +131,7 @@ class RauxSetup {
     try {
       if (process.platform !== 'win32') {
         logError('copyEnvToPythonLib: Only supported on Windows.');
-        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'copyEnvToPythonLib: Only supported on Windows.', step: 'raux-env' });
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'GAIA environment only supported on Windows.', step: 'raux-env' });
         return;
       }
       const gaiaMode = process.env.GAIA_MODE;
@@ -152,7 +152,7 @@ class RauxSetup {
       const destEnv = join(getAppInstallDir(), 'python', 'Lib', '.env');
       if (!existsSync(srcEnv)) {
         logError(`copyEnvToPythonLib: Source ${envFileName} not found at ${srcEnv}`);
-        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: `Source ${envFileName} not found.`, step: 'raux-env' });
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'GAIA environment not found.', step: 'raux-env' });
         return;
       }
       const libDir = join(getAppInstallDir(), 'python', 'Lib');
@@ -161,10 +161,10 @@ class RauxSetup {
       }
       require('fs').copyFileSync(srcEnv, destEnv);
       logInfo(`Copied ${envFileName} to ${destEnv}`);
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: `Copied ${envFileName} to Python Lib.`, step: 'raux-env' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'GAIA environment configured.', step: 'raux-env' });
     } catch (err) {
       logError(`copyEnvToPythonLib failed: ${err}`);
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'copyEnvToPythonLib failed.', step: 'raux-env' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'GAIA environment configuration failed.', step: 'raux-env' });
     }
   }
 }
