@@ -45,13 +45,12 @@ const createWindow = async (): Promise<void> => {
 
 const runInstallationAndBackend = async () => {
   try {
-    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installing Python...' });
     await python.install();
 
-    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installing RAUX...' });
     await raux.install();
 
-    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting backend...' });
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installation successful...' });
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting GAIA...' });
     rauxProcessManager.startRaux();
     
     pollBackend();

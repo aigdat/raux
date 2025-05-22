@@ -130,7 +130,7 @@ class PythonExec {
     const getPipUrl = 'https://bootstrap.pypa.io/get-pip.py';
     const getPipPath = join(PYTHON_DIR, 'get-pip.py');
 
-    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Preparing packaging resource...', step: 'pip-download' });
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Preparing packaging resource...', step: 'pip-download' });
 
     // Download get-pip.py
     await new Promise<void>((resolve, reject) => {

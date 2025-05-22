@@ -105,17 +105,25 @@ class RauxSetup {
 
   private async installRAUXWheel(extractDir: string): Promise<void> {
     logInfo(`Installing RAUX wheel(s) from directory: ${extractDir}...`);
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting GAIA environment installation...', step: 'raux-env' });
+    
     const fs = require('fs');
     const path = require('path');
     const whlFiles = fs.readdirSync(extractDir).filter((f: string) => f.endsWith('.whl'));
+    
     if (whlFiles.length === 0) {
       logError('No .whl files found in extracted build context.');
       this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'No GAIA environment found.', step: 'raux-install' });
       throw new Error('No .whl files found in extracted build context.');
     }
+
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installation may take 5-10 minutes...', step: 'raux-env' });
+    
     for (const whlFile of whlFiles) {
       const wheelPath = path.join(extractDir, whlFile);
+
       const result = await python.runPipCommand(['install', wheelPath, '--verbose', '--no-warn-script-location']);
+      
       if (result.code === 0) {
         logInfo(`${whlFile} installed successfully.`);
         this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'GAIA environment installed successfully.', step: 'raux-install' });
@@ -131,11 +139,15 @@ class RauxSetup {
     try {
       if (process.platform !== 'win32') {
         logError('copyEnvToPythonLib: Only supported on Windows.');
+
         this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'GAIA environment only supported on Windows.', step: 'raux-env' });
+
         return;
       }
+
       const gaiaMode = process.env.GAIA_MODE;
       let envFileName: string;
+
       if (gaiaMode !== undefined) {
         if (gaiaMode === 'HYBRID') {
           envFileName = RauxSetup.RAUX_HYBRID_ENV;
@@ -143,24 +155,31 @@ class RauxSetup {
           envFileName = RauxSetup.RAUX_GENERIC_ENV;
         }
       } else {
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Setting GAIA most ...', step: 'raux-env' });
         const pathEnv = process.env.PATH || '';
         const userProfile = process.env.USERPROFILE || '';
         const hasLemonade = pathEnv.includes('lemonade_server') || userProfile.includes('lemonade_server');
         envFileName = hasLemonade ? RauxSetup.RAUX_HYBRID_ENV : RauxSetup.RAUX_GENERIC_ENV;
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: `GAIA mode set to ${envFileName}.`, step: 'raux-env' });
       }
+
       const srcEnv = join(extractDir, envFileName);
       const destEnv = join(getAppInstallDir(), 'python', 'Lib', '.env');
+
       if (!existsSync(srcEnv)) {
         logError(`copyEnvToPythonLib: Source ${envFileName} not found at ${srcEnv}`);
         this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'GAIA environment not found.', step: 'raux-env' });
         return;
       }
+
       const libDir = join(getAppInstallDir(), 'python', 'Lib');
       if (!existsSync(libDir)) {
         mkdirSync(libDir, { recursive: true });
       }
+
       require('fs').copyFileSync(srcEnv, destEnv);
       logInfo(`Copied ${envFileName} to ${destEnv}`);
+      
       this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'GAIA environment configured.', step: 'raux-env' });
     } catch (err) {
       logError(`copyEnvToPythonLib failed: ${err}`);
