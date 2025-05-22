@@ -45,15 +45,13 @@
     }
 
     .loading-layout {
-      position: relative;
       width: 500px;
       height: auto;
-      min-height: 400px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      padding: 32px 0 24px 0;
+      padding: 32px 24px;
       gap: 16px;
     }
 
@@ -104,27 +102,35 @@
     }
 
     .progress-bar-container {
-      width: 290px;
-      height: 8px;
       background: transparent;
       z-index: 2;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      margin-top: 8px;
-      position: static;
-      left: unset;
-      top: unset;
+      gap: 16px;
+    }
+
+    .progress-message {
+      color: #e5e7eb;
+      font-family: system-ui, sans-serif;
+      font-size: 1rem;
+      margin-bottom: 6px;
+      text-align: center;
+      width: 100%;
+      opacity: 0.95;
     }
 
     .progress-bar {
       width: 100%;
-      height: 8px;
-      background: linear-gradient(90deg, #a3e635 0%, #38bdf8 100%);
+      height: 0.5rem;
+      background: linear-gradient(90deg, #22c55e 0%, #2563eb 100%);
       border-radius: 4px;
-      animation: progress-indeterminate 1.2s linear infinite;
+      animation: progress-indeterminate 2s linear infinite;
       background-size: 200% 100%;
       background-position: 100% 0;
+      border: 2px solid #444;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.28);
     }
 
     @keyframes progress-indeterminate {
@@ -172,6 +178,7 @@
       <img src="../../../static/gaia.png" alt="GAIA" class="gaia-image" />
     </div>
     <div class="progress-bar-container">
+      <div class="progress-message">Configuration and setup in progress, please wait...</div>
       <div class="progress-bar"></div>
     </div>
   </div>
