@@ -35,7 +35,7 @@ class PythonExec {
       
       if (existsSync(PYTHON_DIR)) {
         logInfo('Python directory already exists, skipping installation.');
-        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Python environment configure.', step: 'python-check' });
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Environment setup completed.', step: 'python-check' });
       
         return;
       }

@@ -1,152 +1,74 @@
-# Loading Screen Implementation Plan
+// ... existing code ...
+
+# Auto-Launch Prevention Plan
 
 ## Overview
-Create a loading screen that appears immediately when RAUX Electron app starts, displaying real-time status messages during the installation and startup process.
+Implement a mechanism to prevent RAUX Electron app from automatically launching after installation when installed via GAIA's NSIS installer, while still allowing auto-launch when self-installed.
+
+## Problem Statement
+- RAUX should auto-launch after self-installation (default Squirrel.Windows behavior)
+- RAUX should NOT auto-launch when installed via GAIA's NSIS installer
+- Since install paths may vary, we need a centralized coordination mechanism
+
+## Approach
+Use a temporary environment variable as a flag to control auto-launch behavior:
+1. NSIS installer sets a user environment variable before installing RAUX
+2. RAUX checks for this environment variable at startup
+3. If the variable exists, RAUX exits immediately
+4. NSIS removes the environment variable after a short delay
 
 ## Tasks
 
-### 1. Implement IPC Communication
-- [x] Create an IPC Manager singleton class
-- [x] Set up IPC channels between main process and renderer
-- [x] Create message types for different status updates
-- [x] Implement sending mechanism in main process
-- [x] Implement receiving mechanism in renderer process
-- [x] Centralize IPC channel names in a single class (IPCChannels)
-- [x] Move all IPC-related files (ipcManager.ts, ipcChannels.ts, ipcTypes.ts) to src/ipc/
+### 1. Modify RAUX Electron App
+- [ ] Add environment variable check early in the application lifecycle
+- [ ] If the variable is present, exit the application
+- [ ] Place check before any initialization or window creation
 
-### 2. Modify Main Process (index.ts)
-- [x] Update createWindow to show loading screen first
-- [x] Create separate function for installation process
-- [x] Add IPC message sending at key points in the installation
+### 2. Update GAIA NSIS Installer
+- [ ] Add code to set environment variable before RAUX installation
+- [ ] Add delay and cleanup code to remove the variable after installation
+- [ ] Document this behavior for future maintenance
 
-### 3. Update Installation Process
-- [x] Modify python.install() to send progress updates
-- [x] Modify raux.install() to send progress updates
-- [x] Add progress reporting to wheel download and extraction
-- [x] Add progress reporting to backend startup
-- [x] Refactor pythonExec.ts and rauxSetup.ts to use a private ipcManager instance property for all IPC calls (DRY, clear)
-
-### 4. Create Loading Screen UI
-- [x] Create HTML/CSS for a clean, professional loading screen
-- [x] Add status message area that can display multiple messages
-- [x] Design progress indicator (spinner or progress bar)
-- [ ] Include RAUX branding elements
-
-### 5. Transition Logic
-- [ ] Implement smooth transition from loading screen to RAUX UI
-- [ ] Add error handling that shows helpful messages if installation fails
-- [ ] Create retry mechanism for failed steps
-
-### 6. Testing
-- [ ] Test on fresh install
-- [ ] Test with pre-existing installation
-- [ ] Test with various failure scenarios
+### 3. Testing
+- [ ] Test RAUX self-installation (should auto-launch)
+- [ ] Test RAUX installation via NSIS (should not auto-launch)
+- [ ] Test manual RAUX launch after NSIS installation (should launch)
 
 ## Implementation Details
 
-### IPC Manager Singleton
+### 1. RAUX Electron App Changes (index.ts)
 ```typescript
-// ipcManager.ts - Main Process
-import { ipcMain, WebContents } from 'electron';
-
-export class IPCManager {
-  private static instance: IPCManager;
-  private renderers: Map<number, WebContents> = new Map();
-  
-  private constructor() {
-    // Private constructor to enforce singleton
-  }
-  
-  public static getInstance(): IPCManager {
-    if (!IPCManager.instance) {
-      IPCManager.instance = new IPCManager();
-    }
-    return IPCManager.instance;
-  }
-  
-  // Register a renderer process to receive messages
-  public registerRenderer(id: number, contents: WebContents): void {
-    this.renderers.set(id, contents);
-  }
-  
-  // Remove a renderer when window is closed
-  public unregisterRenderer(id: number): void {
-    this.renderers.delete(id);
-  }
-  
-  // Send message to all renderers
-  public sendToAll(channel: string, ...args: any[]): void {
-    this.renderers.forEach(renderer => {
-      renderer.send(channel, ...args);
-    });
-  }
-  
-  // Send message to specific renderer
-  public sendTo(id: number, channel: string, ...args: any[]): void {
-    const renderer = this.renderers.get(id);
-    if (renderer) {
-      renderer.send(channel, ...args);
-    }
-  }
-  
-  // Listen for messages from renderers
-  public on(channel: string, listener: (...args: any[]) => void): void {
-    ipcMain.on(channel, (event, ...args) => {
-      listener(...args);
-    });
-  }
-}
-
-// Usage in main process
-const ipcManager = IPCManager.getInstance();
-
-// Renderer process counterpart (using contextBridge)
-// preload.ts
-import { contextBridge, ipcRenderer } from 'electron';
-
-contextBridge.exposeInMainWorld('ipc', {
-  send: (channel: string, data: any) => {
-    ipcRenderer.send(channel, data);
-  },
-  on: (channel: string, func: (...args: any[]) => void) => {
-    ipcRenderer.on(channel, (event, ...args) => func(...args));
-  },
-  invoke: (channel: string, data: any) => {
-    return ipcRenderer.invoke(channel, data);
-  }
-});
-```
-
-### IPC Message Structure
-```typescript
-interface StatusMessage {
-  type: 'info' | 'progress' | 'error' | 'success';
-  message: string;
-  progress?: number; // 0-100 for progress updates
-  step?: string; // Current installation step
+// Add this at the top of the file, before any other app initialization code
+if (process.env.RAUX_PREVENT_AUTOLAUNCH === 'true') {
+  logInfo('Detected RAUX_PREVENT_AUTOLAUNCH environment variable. Exiting to prevent auto-launch.');
+  process.exit(0);
 }
 ```
 
-### Loading Screen Flow
-1. Application starts → Show loading screen immediately
-2. Begin installation process in background
-3. Send status updates to loading screen as each step progresses
-4. When installation completes, transition to RAUX UI
-5. If errors occur, display error message with possible actions
+### 2. NSIS Installer Changes (Installer.nsi)
+```nsi
+; Before RAUX installation
+DetailPrint "[RAUX-Installer] Setting environment variable to prevent auto-launch..."
+WriteRegExpandStr HKCU "Environment" "RAUX_PREVENT_AUTOLAUNCH" "true"
+SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
 
-### Message Channel Names
-- `installation:status` - General status updates
-- `installation:progress` - Progress percentage updates
-- `installation:error` - Error notifications
-- `installation:complete` - Installation completed
-- `installation:retry` - Request to retry a failed step
+; Install RAUX here...
 
-### File Changes Required
-- `index.ts`: Modify to show loading screen first and coordinate installation
-- `pythonExec.ts`: Add progress reporting (now complete)
-- `rauxSetup.ts`: Add progress reporting (now complete)
-- Create new files:
-  - `loadingScreen.html`: Loading screen UI
-  - `loadingScreen.js`: Renderer process code
-  - `ipcManager.ts`: IPC Manager singleton class implementation
-  - `preload.ts`: Preload script for exposing IPC to renderer process
+; After RAUX installation, schedule removal of the environment variable
+DetailPrint "[RAUX-Installer] Scheduling environment variable cleanup..."
+nsExec::ExecToStack 'powershell -Command "Start-Sleep -Seconds 5; Remove-ItemProperty -Path \"HKCU:\\Environment\" -Name \"RAUX_PREVENT_AUTOLAUNCH\" -ErrorAction SilentlyContinue"'
+Pop $0
+Pop $1
+DetailPrint "[RAUX-Installer] Scheduled cleanup result: $0"
+```
+
+## Considerations
+1. The 5-second delay is to ensure RAUX has time to start and check the environment variable
+2. If a user manually launches RAUX during this brief window, it will exit immediately
+3. Environment variable will be cleaned up even if RAUX installation fails
+4. Using PowerShell for the delayed cleanup avoids blocking the installer
+
+## Future Improvements
+- Consider a more robust communication mechanism between installers
+- Explore alternatives like command-line arguments to the RAUX launcher
+- Add logging and telemetry to monitor installation success rates

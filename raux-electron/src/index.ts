@@ -18,6 +18,11 @@ declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 const RAUX_URL = 'http://localhost:8080';
 
+if (process.env.RAUX_PREVENT_AUTOLAUNCH === 'true') {
+  logInfo('Detected RAUX_PREVENT_AUTOLAUNCH environment variable. Exiting to prevent auto-launch.');
+  process.exit(100);
+}
+
 logInfo(`Main process started\nArgs: ${process.argv.join(' ')}\n`);
 
 if (handleSquirrelEvent()) {
