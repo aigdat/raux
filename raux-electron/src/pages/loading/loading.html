@@ -47,31 +47,36 @@
     .loading-layout {
       position: relative;
       width: 500px;
-      height: 400px;
+      height: auto;
+      min-height: 400px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
+      padding: 32px 0 24px 0;
+      gap: 16px;
     }
 
-    .gaia-image {
-      position: absolute;
-      left: 65%;
-      top: 50%;
-      transform: translate(-40%, -50%);
-      width: 400px;
-      z-index: 3;
+    .welcome-image {
+      width: 100%;
+      height: auto;
+      max-width: 100%;
+      margin-bottom: 16px;
+      z-index: 1;
       pointer-events: none;
-      opacity: 1;
+    }
+
+    .center-row {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      position: relative;
+      margin-bottom: 16px;
     }
 
     #status-messages {
-      position: absolute;
-      left: -10%;
-      top: 50%;
-      transform: translateY(-50%) translateX(-30px);
-      width: 320px;
-      max-width: 90vw;
       background: #23232a;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
@@ -84,6 +89,10 @@
       overflow-y: auto;
       z-index: 1;
       opacity: 0.95;
+      /* width: 400px; */
+      min-width: 400px;
+      margin-right: -150px;
+      margin-left: 50px;
     }
 
     #status-messages div {
@@ -95,9 +104,6 @@
     }
 
     .progress-bar-container {
-      position: absolute;
-      left: -10%;
-      top: 90%;
       width: 290px;
       height: 8px;
       background: transparent;
@@ -105,6 +111,10 @@
       display: flex;
       align-items: center;
       justify-content: flex-start;
+      margin-top: 8px;
+      position: static;
+      left: unset;
+      top: unset;
     }
 
     .progress-bar {
@@ -126,30 +136,41 @@
         background-position: 0 0;
       }
     }
+
+    .gaia-image {
+      width: 400px;
+      max-width: 90%;
+      z-index: 2;
+      pointer-events: none;
+      opacity: 1;
+      margin-left: 0;
+    }
   </style>
 </head>
 
 <body>
   <div class="loading-layout">
-    <!-- <div id="status-messages"></div> -->
-    <div id="status-messages">
-      <div>Installing Python...</div>
-      <div>Checking Python installation...</div>
-      <div>Downloading Python...</div>
-      <div>Python download finished.</div>
-      <div>Extracting Python...</div>
-      <div>Python extraction finished.</div>
-      <div>Installing pip...</div>
-      <div>get-pip.py download finished.</div>
-      <div>pip installed successfully.</div>
-      <div>Python and pip setup completed.</div>
-      <div>Installing RAUX...</div>
-      <div>Downloading RAUX wheel...</div>
-      <div>RAUX wheel download finished.</div>
-      <div>RAUX wheel extraction finished.</div>
-      <div>Installing RAUX wheel...</div>
+    <img src="../../../static/welcome.png" alt="Welcome" class="welcome-image" />
+    <div class="center-row">
+      <div id="status-messages">
+        <div>Installing Python...</div>
+        <div>Checking Python installation...</div>
+        <div>Downloading Python...</div>
+        <div>Python download finished.</div>
+        <div>Extracting Python...</div>
+        <div>Python extraction finished.</div>
+        <div>Installing pip...</div>
+        <div>get-pip.py download finished.</div>
+        <div>pip installed successfully.</div>
+        <div>Python and pip setup completed.</div>
+        <div>Installing RAUX...</div>
+        <div>Downloading RAUX wheel...</div>
+        <div>RAUX wheel download finished.</div>
+        <div>RAUX wheel extraction finished.</div>
+        <div>Installing RAUX wheel...</div>
+      </div>
+      <img src="../../../static/gaia.png" alt="GAIA" class="gaia-image" />
     </div>
-    <img src="../../../static/gaia.png" alt="GAIA" class="gaia-image" />
     <div class="progress-bar-container">
       <div class="progress-bar"></div>
     </div>
