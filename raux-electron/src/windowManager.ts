@@ -32,11 +32,16 @@ export class WindowManager {
       },
       show: true,
     });
+
     this.mainWindow.setMenuBarVisibility(false);
+    
     this.mainWindow.loadFile(LOADING_PAGE);
+    
     this.ipcManager.registerRenderer(this.mainWindow.webContents.id, this.mainWindow.webContents);
+    
     this.mainWindow.on('closed', () => {
       this.ipcManager.unregisterRenderer(this.mainWindow?.webContents.id);
+      this.ipcManager.unregisterAllRenderers();
       this.mainWindow = null;
     });
   }

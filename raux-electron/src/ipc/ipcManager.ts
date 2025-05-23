@@ -21,16 +21,38 @@ export class IPCManager {
     this.renderers.delete(id);
   }
 
+  public unregisterAllRenderers(): void {
+    this.renderers.clear();
+  }
+
   public sendToAll(channel: string, ...args: any[]): void {
-    this.renderers.forEach(renderer => {
-      renderer.send(channel, ...args);
+    this.renderers.forEach((renderer, id) => {
+      if (renderer.isDestroyed()) {
+        this.renderers.delete(id);
+        return;
+      }
+
+      try {
+        renderer.send(channel, ...args);
+      } catch (err) {
+        // Optionally log the error
+        // console.error(`IPC sendToAll error: ${err}`);
+      }
     });
   }
 
   public sendTo(id: number, channel: string, ...args: any[]): void {
     const renderer = this.renderers.get(id);
-    if (renderer) {
-      renderer.send(channel, ...args);
+    
+    if (renderer && !renderer.isDestroyed()) {
+      try {
+        renderer.send(channel, ...args);
+      } catch (err) {
+        // Optionally log the error
+        // console.error(`IPC sendTo error: ${err}`);
+      }
+    } else if (renderer && renderer.isDestroyed()) {
+      this.renderers.delete(id);
     }
   }
 

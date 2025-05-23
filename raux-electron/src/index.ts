@@ -17,6 +17,8 @@ declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 const RAUX_URL = 'http://localhost:8080';
+app.setAppUserModelId("com.squirrel.GaiaBeta.GaiaBeta");
+
 
 if (process.env.RAUX_PREVENT_AUTOLAUNCH === 'true') {
   logInfo('Detected RAUX_PREVENT_AUTOLAUNCH environment variable. Exiting to prevent auto-launch.');

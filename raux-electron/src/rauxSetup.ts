@@ -105,7 +105,7 @@ class RauxSetup {
 
   private async installRAUXWheel(extractDir: string): Promise<void> {
     logInfo(`Installing RAUX wheel(s) from directory: ${extractDir}...`);
-    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting GAIA environment installation...', step: 'raux-env' });
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Initiating GAIA environment setup...', step: 'raux-env' });
     
     const fs = require('fs');
     const path = require('path');
@@ -117,7 +117,7 @@ class RauxSetup {
       throw new Error('No .whl files found in extracted build context.');
     }
 
-    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installation may take 5-10 minutes...', step: 'raux-env' });
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Initial setup may take 5-10 minutes...', step: 'raux-env' });
     
     for (const whlFile of whlFiles) {
       const wheelPath = path.join(extractDir, whlFile);
