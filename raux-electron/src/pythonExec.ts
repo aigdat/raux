@@ -48,7 +48,7 @@ class PythonExec {
       this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Pre-checking environment variables...', step: 'python-download' });
       await this.downloadPython(url, zipPath);
       
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Extracting intenral libraries...', step: 'python-extract' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Extracting internal libraries...', step: 'python-extract' });
       await this.extractPython(zipPath, PYTHON_DIR);
       this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Configuring dependencies...', step: 'pip-install' });
       

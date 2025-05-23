@@ -2,7 +2,7 @@ import type { Configuration } from 'webpack';
 import * as path from 'path';
 import * as fs from 'fs';
 import webpack from 'webpack';
-const CopyPlugin = require('copy-webpack-plugin');
+import CopyPlugin from 'copy-webpack-plugin';
 
 import { rules } from './webpack.rules';
 import { plugins } from './webpack.plugins';

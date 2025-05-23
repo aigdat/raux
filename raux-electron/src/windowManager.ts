@@ -35,6 +35,10 @@ export class WindowManager {
     this.mainWindow.setMenuBarVisibility(false);
     this.mainWindow.loadFile(LOADING_PAGE);
     this.ipcManager.registerRenderer(this.mainWindow.webContents.id, this.mainWindow.webContents);
+    this.mainWindow.on('closed', () => {
+      this.ipcManager.unregisterRenderer(this.mainWindow?.webContents.id);
+      this.mainWindow = null;
+    });
   }
 
   public showLoadingPage(): void {

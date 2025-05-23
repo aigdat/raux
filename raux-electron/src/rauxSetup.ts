@@ -40,7 +40,7 @@ class RauxSetup {
         }
       }
       logInfo('RAUX wheel and env setup completed successfully.');
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'GAIA environment setup completed.', step: 'raux-complete' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_COMPLETE, { type: 'success', message: 'GAIA environment setup completed.', step: 'raux-complete' });
     } catch (err) {
       logError(`RAUX wheel installation failed: ${err}`);
       this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'GAIA installation failed, check logs!', step: 'raux-error' });
@@ -155,7 +155,7 @@ class RauxSetup {
           envFileName = RauxSetup.RAUX_GENERIC_ENV;
         }
       } else {
-        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Setting GAIA most ...', step: 'raux-env' });
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Setting GAIA mode ...', step: 'raux-env' });
         const pathEnv = process.env.PATH || '';
         const userProfile = process.env.USERPROFILE || '';
         const hasLemonade = pathEnv.includes('lemonade_server') || userProfile.includes('lemonade_server');
