@@ -43,4 +43,13 @@ export function getPythonPath() {
     return 'python'; // Use system Python in dev
   }
   return join(getAppInstallDir(), 'python', process.platform === 'win32' ? 'python.exe' : 'bin/python3');
+}
+
+// Returns the correct path to a renderer asset (html, js) for dev and production
+export function getRendererPath(...segments: string[]): string {
+  // In production, files are in .webpack/renderer/
+  const base = app.isPackaged ? app.getAppPath() : __dirname;
+  return app.isPackaged
+    ? join(base, '.webpack', 'renderer', ...segments)
+    : join(base, ...segments);
 } 

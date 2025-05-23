@@ -1,62 +1,74 @@
-# Refactoring Plan for RAUX Python Setup
+// ... existing code ...
 
-## Current Structure
+# Auto-Launch Prevention Plan
 
-- `index.ts`: Main entry point that calls Python/RAUX setup and starts RAUX processes
-- `forge.config.ts`: Electron Forge configuration (packaging, resources)
-- `pythonExec.ts`: Handles all Python-related functionality (singleton)
-- `rauxSetup.ts`: Handles all RAUX-specific installation and environment setup (singleton)
+## Overview
+Implement a mechanism to prevent RAUX Electron app from automatically launching after installation when installed via GAIA's NSIS installer, while still allowing auto-launch when self-installed.
 
-## Progress
+## Problem Statement
+- RAUX should auto-launch after self-installation (default Squirrel.Windows behavior)
+- RAUX should NOT auto-launch when installed via GAIA's NSIS installer
+- Since install paths may vary, we need a centralized coordination mechanism
 
-### 1. Consolidate Python functionality in `pythonExec.ts`
+## Approach
+Use a temporary environment variable as a flag to control auto-launch behavior:
+1. NSIS installer sets a user environment variable before installing RAUX
+2. RAUX checks for this environment variable at startup
+3. If the variable exists, RAUX exits immediately
+4. NSIS removes the environment variable after a short delay
 
-- [x] Create a new `pythonExec.ts` singleton that encapsulates all Python/pip setup and execution logic
-- [x] Expose public methods for Python execution, pip execution, and setup
+## Tasks
 
-### 2. Create a dedicated RAUX installer module
+### 1. Modify RAUX Electron App
+- [ ] Add environment variable check early in the application lifecycle
+- [ ] If the variable is present, exit the application
+- [ ] Place check before any initialization or window creation
 
-- [x] Create `rauxSetup.ts` singleton for RAUX-specific installation and environment configuration
-- [x] Use `pythonExec.ts` for all Python/pip operations
+### 2. Update GAIA NSIS Installer
+- [ ] Add code to set environment variable before RAUX installation
+- [ ] Add delay and cleanup code to remove the variable after installation
+- [ ] Document this behavior for future maintenance
 
-### 3. Define clear interface for Python execution
+### 3. Testing
+- [ ] Test RAUX self-installation (should auto-launch)
+- [ ] Test RAUX installation via NSIS (should not auto-launch)
+- [ ] Test manual RAUX launch after NSIS installation (should launch)
 
-- [x] Create a public interface in `pythonExec.ts`:
-  ```typescript
-  export interface PythonExecutor {
-    runPythonCommand(command: string[], options?: ExecutionOptions): Promise<ExecutionResult>;
-    runPipCommand(command: string[], options?: ExecutionOptions): Promise<ExecutionResult>;
-    getPythonPath(): string;
-    ensurePythonInstalled(): Promise<void>;
-  }
-  ```
+## Implementation Details
 
-### 4. Design module interactions
+### 1. RAUX Electron App Changes (index.ts)
+```typescript
+// Add this at the top of the file, before any other app initialization code
+if (process.env.RAUX_PREVENT_AUTOLAUNCH === 'true') {
+  logInfo('Detected RAUX_PREVENT_AUTOLAUNCH environment variable. Exiting to prevent auto-launch.');
+  process.exit(0);
+}
+```
 
-- [x] `pythonExec.ts`: Handles all Python-related functionality
-  - Private: Installation and setup methods
-  - Public: Execution and environment methods
-- [x] `rauxSetup.ts`: Uses `pythonExec.ts` to install RAUX packages
+### 2. NSIS Installer Changes (Installer.nsi)
+```nsi
+; Before RAUX installation
+DetailPrint "[RAUX-Installer] Setting environment variable to prevent auto-launch..."
+WriteRegExpandStr HKCU "Environment" "RAUX_PREVENT_AUTOLAUNCH" "true"
+SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
 
-### 5. Update imports and usage
+; Install RAUX here...
 
-- [x] Update `index.ts` to use the new module structure
-- [x] Update any other files that directly use Python-related functionality
-- [x] Remove the now obsolete RAUX install logic from `pythonSetup.ts`
+; After RAUX installation, schedule removal of the environment variable
+DetailPrint "[RAUX-Installer] Scheduling environment variable cleanup..."
+nsExec::ExecToStack 'powershell -Command "Start-Sleep -Seconds 5; Remove-ItemProperty -Path \"HKCU:\\Environment\" -Name \"RAUX_PREVENT_AUTOLAUNCH\" -ErrorAction SilentlyContinue"'
+Pop $0
+Pop $1
+DetailPrint "[RAUX-Installer] Scheduled cleanup result: $0"
+```
 
-### 6. Ensure thread safety and error handling
+## Considerations
+1. The 5-second delay is to ensure RAUX has time to start and check the environment variable
+2. If a user manually launches RAUX during this brief window, it will exit immediately
+3. Environment variable will be cleaned up even if RAUX installation fails
+4. Using PowerShell for the delayed cleanup avoids blocking the installer
 
-- [ ] Add proper error handling in new modules (partially done, review for completeness)
-- [ ] Ensure thread-safe execution of Python commands (review if needed)
-- [ ] Add initialization checks to prevent duplicate setup (review if needed)
-
-## Implementation Approach
-
-- [x] Create `pythonExec.ts` by migrating core functionality from `pythonSetup.ts`
-- [x] Create `rauxSetup.ts` for RAUX-specific setup
-- [x] Update `index.ts` to use the new modules
-- [x] Remove RAUX install logic from `pythonSetup.ts` once migration is complete
-
-## TODO
-- [ ] Final review for error handling, thread safety, and initialization checks
-- [ ] Remove/clean up any remaining legacy code or unused files
+## Future Improvements
+- Consider a more robust communication mechanism between installers
+- Explore alternatives like command-line arguments to the RAUX launcher
+- Add logging and telemetry to monitor installation success rates
