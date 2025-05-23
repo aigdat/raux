@@ -39,11 +39,8 @@ export class WindowManager {
     
     this.ipcManager.registerRenderer(this.mainWindow.webContents.id, this.mainWindow.webContents);
     
-    this.mainWindow.on('closed', () => {
-      this.ipcManager.unregisterRenderer(this.mainWindow?.webContents.id);
-      this.ipcManager.unregisterAllRenderers();
-      this.mainWindow = null;
-    });
+    this.mainWindow.on('close', () => this.destroyIcps());
+    this.mainWindow.on('closed', () => this.destroyIcps());
   }
 
   public showLoadingPage(): void {
@@ -66,5 +63,11 @@ export class WindowManager {
 
   public getMainWindow(): BrowserWindow | null {
     return this.mainWindow;
+  }
+
+  public destroyIcps() {
+    this.ipcManager.unregisterRenderer(this.mainWindow?.webContents.id);
+    this.ipcManager.unregisterAllRenderers();
+    this.mainWindow = null;
   }
 } 
