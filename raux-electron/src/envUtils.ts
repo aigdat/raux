@@ -1,6 +1,8 @@
 import { app } from 'electron';
 import { join, dirname } from 'path';
-import os from 'os';
+import os, { tmpdir } from 'os';
+import { existsSync, unlinkSync } from 'fs';
+import { logInfo, logError } from './logger';
 
 export const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === '1';
 
@@ -52,4 +54,26 @@ export function getRendererPath(...segments: string[]): string {
   return app.isPackaged
     ? join(base, '.webpack', 'renderer', ...segments)
     : join(base, ...segments);
+}
+
+// Check for auto-launch prevention flag file
+export function checkAndHandleAutoLaunchPrevention(): boolean {
+  const preventAutoLaunchFile = join(tmpdir(), 'RAUX_PREVENT_AUTOLAUNCH');
+  
+  if (existsSync(preventAutoLaunchFile)) {
+    logInfo('Detected RAUX_PREVENT_AUTOLAUNCH flag file. Exiting to prevent auto-launch.');
+    try {
+      unlinkSync(preventAutoLaunchFile); // Clean up the file
+      
+      logInfo('Removed RAUX_PREVENT_AUTOLAUNCH flag file successfully.');
+      
+      return true; // Should exit
+
+    } catch (error) {
+      logError('Failed to remove RAUX_PREVENT_AUTOLAUNCH flag file: ' + (error && error.toString ? error.toString() : String(error)));
+    }
+    return true; // Should exit
+  }
+  
+  return false; // Should not exit
 } 

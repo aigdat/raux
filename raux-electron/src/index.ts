@@ -1,6 +1,6 @@
 import { app } from 'electron';
 import { logInfo, logError } from './logger';
-import { getAppInstallDir } from './envUtils';
+import { getAppInstallDir, checkAndHandleAutoLaunchPrevention } from './envUtils';
 import { handleSquirrelEvent } from './squirrelEvents';
 import { rauxProcessManager } from './rauxProcessManager';
 import { setTimeout } from 'timers';
@@ -19,10 +19,9 @@ declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 const RAUX_URL = 'http://localhost:8080';
 app.setAppUserModelId("com.squirrel.GaiaBeta.GaiaBeta");
 
-
-if (process.env.RAUX_PREVENT_AUTOLAUNCH === 'true') {
-  logInfo('Detected RAUX_PREVENT_AUTOLAUNCH environment variable. Exiting to prevent auto-launch.');
-  process.exit(100);
+// Check for auto-launch prevention flag and exit if needed
+if (checkAndHandleAutoLaunchPrevention()) {
+  process.exit(0);
 }
 
 logInfo(`Main process started\nArgs: ${process.argv.join(' ')}\n`);

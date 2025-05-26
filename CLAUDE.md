@@ -191,4 +191,8 @@ RAUX can be installed:
 3. Via raux_installer.py script with debug capabilities
 4. Through Python pip for development
 
-**Versioning**: Dual scheme with product version (0.6.5+raux.0.2.0) and Electron version (0.2.0).
+**Versioning**: Dual scheme (0.6.5+raux.0.2.0) with original OpenWebUI version (0.6.5) and RAUX (raux.0.2.0); Electron follows RAUX version (0.2.0).
+
+## Memories and Guidance
+
+- Remember that "node_modules" folder is not our code; its ok to reference but don't check for errors or lint
