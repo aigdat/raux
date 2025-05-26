@@ -62,17 +62,16 @@ export function checkAndHandleAutoLaunchPrevention(): boolean {
   
   if (existsSync(preventAutoLaunchFile)) {
     logInfo('Detected RAUX_PREVENT_AUTOLAUNCH flag file. Exiting to prevent auto-launch.');
+    
+    // Remove the flag file as per plan
     try {
-      unlinkSync(preventAutoLaunchFile); // Clean up the file
-      
+      unlinkSync(preventAutoLaunchFile);
       logInfo('Removed RAUX_PREVENT_AUTOLAUNCH flag file successfully.');
-      
-      return true; // Should exit
-
     } catch (error) {
       logError('Failed to remove RAUX_PREVENT_AUTOLAUNCH flag file: ' + (error && error.toString ? error.toString() : String(error)));
     }
-    return true; // Should exit
+    
+    return true; // Should exit immediately after
   }
   
   return false; // Should not exit
