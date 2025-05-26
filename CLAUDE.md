@@ -38,6 +38,12 @@ RAUX is designed to be installed as part of the GAIA ecosystem, though it mainta
 2. Invokes RAUX Electron app installation process
 3. RAUX setup handles Python environment, wheel installation, and configuration
 
+**Installer Architecture:**
+- **GAIA**: Uses NSIS installer (traditional Windows installer system)
+- **RAUX**: Uses Squirrel installer from Electron Forge (auto-updater/installer for Electron apps)
+- **Integration**: GAIA NSIS installer downloads and invokes RAUX Squirrel installer (`raux-setup.exe`)
+- **Auto-launch Coordination**: Squirrel installer auto-launches RAUX by default; coordination mechanism needed to prevent this when installed via GAIA
+
 **Key Installation Files:**
 - `raux-electron/src/rauxSetup.ts`: Main installation orchestration
 - `raux-electron/src/pythonExec.ts`: Python environment management
