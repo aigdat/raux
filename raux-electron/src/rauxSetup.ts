@@ -22,7 +22,44 @@ class RauxSetup {
     return RauxSetup.instance;
   }
 
+  public isRAUXInstalled(): boolean {
+    try {
+      logInfo('Checking if RAUX is already installed...');
+      
+      // Check if .env file exists
+      const envFile = join(getAppInstallDir(), 'python', 'Lib', '.env');
+      if (!existsSync(envFile)) {
+        logInfo(`RAUX env file not found at: ${envFile}`);
+        return false;
+      }
+      logInfo(`RAUX env file found at: ${envFile}`);
+
+      // Check if open-webui module is callable
+      logInfo('Checking if open-webui module is callable...');
+      const { execSync } = require('child_process');
+      const pythonPath = join(getAppInstallDir(), 'python', 'python.exe');
+      execSync(`"${pythonPath}" -m open_webui --help`, {
+        encoding: 'utf8',
+        timeout: 2000,
+        windowsHide: true
+      });
+      
+      logInfo('RAUX installation verified successfully');
+      return true;
+    } catch (err) {
+      logError(`RAUX installation check failed: ${err}`);
+      return false;
+    }
+  }
+
   public async install(): Promise<void> {
+    // Check if RAUX is already installed
+    if (this.isRAUXInstalled()) {
+      logInfo('RAUX installation already exists and is functional, skipping installation.');
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'GAIA environment already configured.', step: 'raux-check' });
+      return;
+    }
+
     let tmpDir: string | null = null;
     try {
       this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Downloading GAIA environment...', step: 'raux-download' });
