@@ -1,6 +1,6 @@
 import { app } from 'electron';
 import { logInfo, logError } from './logger';
-import { getAppInstallDir, checkAndHandleAutoLaunchPrevention } from './envUtils';
+import { getAppInstallDir, checkAndHandleAutoLaunchPrevention, isInstallationComplete } from './envUtils';
 import { handleSquirrelEvent } from './squirrelEvents';
 import { rauxProcessManager } from './rauxProcessManager';
 import { setTimeout } from 'timers';
@@ -44,11 +44,37 @@ const createWindow = async (): Promise<void> => {
     } else {
       windowManager.createMainWindow();
 
-      runInstallationAndBackend();
+      // Check if installation is complete
+      const isInstalled = await isInstallationComplete();
+      
+      if (isInstalled) {
+        logInfo('Existing installation detected, skipping installation steps');
+        // For existing installations, just start the backend
+        runBackendOnly();
+      } else {
+        logInfo('No existing installation detected, running full installation');
+        // For new installations, run the full installation process
+        runInstallationAndBackend();
+      }
     }
   } catch (err) {
     logError('Error in createWindow: ' + (err && err.toString ? err.toString() : String(err)));
     throw err;
+  }
+};
+
+const runBackendOnly = async () => {
+  try {
+    // Send startup messages instead of installation messages
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting GAIA...' });
+
+    rauxProcessManager.startRaux();
+
+    pollBackend();
+  } catch (err) {
+    logError('Backend startup failed: ' + (err && err.toString ? err.toString() : String(err)));
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to start GAIA. Check logs.' });
+    windowManager.showErrorPage('Failed to start GAIA');
   }
 };
 

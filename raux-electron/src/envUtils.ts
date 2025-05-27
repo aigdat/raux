@@ -75,4 +75,35 @@ export function checkAndHandleAutoLaunchPrevention(): boolean {
   }
   
   return false; // Should not exit
+}
+
+// Check if RAUX installation is complete by testing if open-webui is callable
+export async function isInstallationComplete(): Promise<boolean> {
+  const pythonDir = join(getAppInstallDir(), 'python');
+  
+  // Quick check if Python directory exists first
+  if (!existsSync(pythonDir)) {
+    logInfo('Installation check: Python directory not found');
+    return false;
+  }
+  
+  try {
+    // Import execSync for synchronous execution
+    const { execSync } = require('child_process');
+    const pythonPath = getPythonPath();
+    
+    // Try to run open-webui --help to verify installation
+    execSync(`"${pythonPath}" -m open_webui --help`, {
+      encoding: 'utf8',
+      timeout: 2000, // 2 second timeout - help should be instant
+      windowsHide: true
+    });
+    
+    // If we get here without throwing, the command succeeded
+    logInfo('Installation check: open-webui module is callable');
+    return true;
+  } catch (error) {
+    logInfo('Installation check: open-webui module not callable - ' + (error && error.toString ? error.toString() : String(error)));
+    return false;
+  }
 } 

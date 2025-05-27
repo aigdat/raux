@@ -34,7 +34,7 @@ RAUX is designed to be installed as part of the GAIA ecosystem, though it mainta
 
 ### Installation Process Details
 **From GAIA Perspective:**
-1. Downloads wheel context from: `https://github.com/aigdat/raux/releases/latest/download/raux-wheel-context.zip`
+1. Downloads wheel context from: `https://github.com/aigdat/raux/releases/<VERSION>/download/raux-wheel-context.zip`
 2. Invokes RAUX Electron app installation process
 3. RAUX setup handles Python environment, wheel installation, and configuration
 
