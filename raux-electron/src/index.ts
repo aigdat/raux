@@ -17,6 +17,7 @@ declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 const RAUX_URL = 'http://localhost:8080';
+
 app.setAppUserModelId("com.squirrel.GaiaBeta.GaiaBeta");
 
 logInfo(`Main process started\nArgs: ${process.argv.join(' ')}\n`);
@@ -49,13 +50,17 @@ const runInstallationAndBackend = async () => {
 
     await raux.install();
 
+        // Check for auto-launch prevention flag and exit if needed
+    if (checkAndHandleAutoLaunchPrevention()) {
+      
+      ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Installation successful...' });
+
+      app.quit();
+      return;
+    }
+
     ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installation successful...' });
     ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting GAIA...' });
-
-    // Check for auto-launch prevention flag and exit if needed
-    if (checkAndHandleAutoLaunchPrevention()) {
-      app.quit();
-    }
 
     rauxProcessManager.startRaux();
 
