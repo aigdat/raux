@@ -15,10 +15,10 @@ export function getAppInstallDir() {
   // On Windows, use LOCALAPPDATA env var for AppData\Local
   if (process.platform === 'win32') {
     const localAppData = process.env.LOCALAPPDATA || join(os.homedir(), 'AppData', 'Local');
-    return join(localAppData, 'raux');
+    return join(localAppData, 'GaiaBeta');
   }
 
-  return join(app.getPath('appData'), 'raux');
+  return join(app.getPath('appData'), 'GaiaBeta');
 }
 
 // Directory for user data (settings, logs, etc.)
