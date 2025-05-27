@@ -39,3 +39,26 @@ Use a temporary file as a flag to control auto-launch behavior:
 - [ ] Test RAUX self-installation (should auto-launch)
 - [ ] Test RAUX installation via NSIS (should not auto-launch)
 - [ ] Test manual RAUX launch after NSIS installation (should launch)
+
+## Implementation Details
+
+### RAUX Implementation (COMPLETED)
+1. **Location**: `raux-electron/src/envUtils.ts`
+   - Created `checkAndHandleAutoLaunchPrevention()` function
+   - Checks for `RAUX_PREVENT_AUTOLAUNCH` file in temp directory
+   - Removes the file if found
+   - Returns true to signal the app should exit
+
+2. **Integration**: `raux-electron/src/index.ts`
+   - Calls `checkAndHandleAutoLaunchPrevention()` early (line 23)
+   - Exits immediately with `process.exit(0)` if flag detected (line 24)
+   - This occurs BEFORE:
+     - Any window creation
+     - Squirrel event handling
+     - Installation processes
+     - Any UI initialization
+
+3. **Behavior**:
+   - First launch (with flag): Detects → Removes → Exits silently
+   - Second launch (no flag): Proceeds normally with installation
+   - No windows shown or installation performed when flag is present
