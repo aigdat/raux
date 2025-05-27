@@ -35,9 +35,17 @@ const windowManager = WindowManager.getInstance();
 
 const createWindow = async (): Promise<void> => {
   try {
-    logInfo('Calling createWindow');
-    windowManager.createMainWindow();
-    runInstallationAndBackend();
+    // Check for auto-launch prevention flag and exit if needed
+    if (checkAndHandleAutoLaunchPrevention()) {
+
+      ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Installation successful...' });
+
+      app.quit();
+    } else {
+      windowManager.createMainWindow();
+
+      runInstallationAndBackend();
+    }
   } catch (err) {
     logError('Error in createWindow: ' + (err && err.toString ? err.toString() : String(err)));
     throw err;
@@ -49,15 +57,6 @@ const runInstallationAndBackend = async () => {
     await python.install();
 
     await raux.install();
-
-        // Check for auto-launch prevention flag and exit if needed
-    if (checkAndHandleAutoLaunchPrevention()) {
-      
-      ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Installation successful...' });
-
-      app.quit();
-      return;
-    }
 
     ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installation successful...' });
     ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting GAIA...' });
