@@ -192,7 +192,8 @@ class RauxSetup {
       throw new Error('No .whl files found in extracted build context.');
     }
 
-    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installing components (this may take several minutes)...', step: 'raux-env' });
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installing components!', step: 'raux-env' });
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: ' this may take 5 - 10 minutes...', step: 'raux-env' });
     
     for (const whlFile of whlFiles) {
       const wheelPath = path.join(extractDir, whlFile);
