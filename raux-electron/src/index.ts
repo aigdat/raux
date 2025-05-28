@@ -37,61 +37,88 @@ const createWindow = async (): Promise<void> => {
   try {
     // Check for auto-launch prevention flag and exit if needed
     if (checkAndHandleAutoLaunchPrevention()) {
-
       ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Installation successful...' });
-
       app.quit();
-    } else {
-      windowManager.createMainWindow();
-
-      // Check if installation is complete
-      const isInstalled = await isInstallationComplete();
-      
-      if (isInstalled) {
-        logInfo('Existing installation detected, skipping installation steps');
-        // For existing installations, just start the backend
-        runBackendOnly();
-      } else {
-        logInfo('No existing installation detected, running full installation');
-        // For new installations, run the full installation process
-        runInstallationAndBackend();
-      }
+      return;
     }
+
+    windowManager.createMainWindow();
+
+    // Central routing based on installation status
+    await routeApplicationFlow();
   } catch (err) {
     logError('Error in createWindow: ' + (err && err.toString ? err.toString() : String(err)));
     throw err;
   }
 };
 
-const runBackendOnly = async () => {
+const routeApplicationFlow = async (): Promise<void> => {
   try {
-    // Send startup messages instead of installation messages
-    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting GAIA...' });
-
-    rauxProcessManager.startRaux();
-
-    pollBackend();
+    const isInstalled = await isInstallationComplete();
+    
+    if (isInstalled) {
+      logInfo('Existing installation detected, running startup flow');
+      await runStartupFlow();
+    } else {
+      logInfo('No existing installation detected, running installation flow');
+      await runInstallationFlow();
+    }
   } catch (err) {
-    logError('Backend startup failed: ' + (err && err.toString ? err.toString() : String(err)));
-    ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to start GAIA. Check logs.' });
-    windowManager.showErrorPage('Failed to start GAIA');
+    logError('Error in routing application flow: ' + (err && err.toString ? err.toString() : String(err)));
+    throw err;
   }
 };
 
-const runInstallationAndBackend = async () => {
+// Startup flow for existing installations
+const runStartupFlow = async (): Promise<void> => {
   try {
-    await python.install();
-
-    await raux.install();
-
-    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installation successful...' });
-    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting GAIA...' });
+    // Clear startup messaging - no installation-like messages
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Verifying environment...' });
+    
+    // Quick verification without installation messaging
+    if (!python.verifyEnvironment()) {
+      throw new Error('Python environment verification failed');
+    }
+    
+    if (!raux.verifyInstallation()) {
+      throw new Error('RAUX environment verification failed');
+    }
+    
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Environment ready.' });
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting GAIA Beta services...' });
 
     rauxProcessManager.startRaux();
 
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Connecting to GAIA Beta...' });
     pollBackend();
   } catch (err) {
-    logError('Installation or backend startup failed: ' + (err && err.toString ? err.toString() : String(err)));
+    logError('Startup failed: ' + (err && err.toString ? err.toString() : String(err)));
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to start GAIA Beta. Check logs.' });
+    windowManager.showErrorPage('Failed to start GAIA Beta');
+  }
+};
+
+// Installation flow for new installations
+const runInstallationFlow = async (): Promise<void> => {
+  try {
+    // Installation-specific messaging
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Beginning GAIA Beta installation...' });
+    
+    // Install Python environment with installation messages
+    await python.install();
+
+    // Install RAUX with installation messages
+    await raux.install();
+
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Installation completed successfully!' });
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting GAIA Beta for the first time...' });
+
+    rauxProcessManager.startRaux();
+
+    ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Initializing GAIA Beta...' });
+    pollBackend();
+  } catch (err) {
+    logError('Installation failed: ' + (err && err.toString ? err.toString() : String(err)));
     ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Installation failed. Check logs.' });
     windowManager.showErrorPage('Installation failed');
   }

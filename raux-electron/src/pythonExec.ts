@@ -29,13 +29,42 @@ class PythonExec {
     return PYTHON_EXE;
   }
 
+  // Verification method for startup flow - no installation messages
+  public verifyEnvironment(): boolean {
+    try {
+      if (!existsSync(PYTHON_DIR)) {
+        logInfo('Python environment verification: directory not found');
+        return false;
+      }
+      
+      if (!existsSync(PYTHON_EXE)) {
+        logInfo('Python environment verification: executable not found');
+        return false;
+      }
+      
+      // Quick check that Python is callable
+      const { execSync } = require('child_process');
+      execSync(`"${PYTHON_EXE}" --version`, {
+        encoding: 'utf8',
+        timeout: 2000,
+        windowsHide: true
+      });
+      
+      logInfo('Python environment verification: passed');
+      return true;
+    } catch (err) {
+      logError(`Python environment verification failed: ${err}`);
+      return false;
+    }
+  }
+
   public async install(): Promise<void> {
     try {
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Checking Python environment ...', step: 'python-check' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Setting up runtime environment...', step: 'python-check' });
       
       if (existsSync(PYTHON_DIR)) {
         logInfo('Python directory already exists, skipping installation.');
-        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Environment setup completed.', step: 'python-check' });
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Runtime environment already configured.', step: 'python-check' });
       
         return;
       }
@@ -45,20 +74,21 @@ class PythonExec {
       const url = this.getPythonDownloadUrl();
       const zipPath = join(PYTHON_DIR, 'python-embed.zip');
 
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Pre-checking environment variables...', step: 'python-download' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Downloading runtime components...', step: 'python-download' });
+      logInfo('Downloading Python from: ' + url);
       await this.downloadPython(url, zipPath);
       
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Extracting internal libraries...', step: 'python-extract' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Extracting runtime libraries...', step: 'python-extract' });
       await this.extractPython(zipPath, PYTHON_DIR);
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Configuring dependencies...', step: 'pip-install' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Configuring package management...', step: 'pip-install' });
       
       await this.ensurePipInstalled();
 
       logInfo('Python and pip setup completed successfully.');
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Environment setup completed.', step: 'python-complete' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Runtime environment ready.', step: 'python-complete' });
     } catch (err) {
       logError('Python installation failed: ' + (err && err.toString ? err.toString() : String(err)));
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Environment config failed!', step: 'python-error' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Runtime environment setup failed!', step: 'python-error' });
       throw err;
     }
   }
@@ -100,7 +130,7 @@ class PythonExec {
           file.on('finish', () => {
             file.close();
             logInfo('Python download finished.');
-            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Environment download completed.', step: 'python-download' });
+            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Runtime components downloaded.', step: 'python-download' });
             resolve();
           });
         })
@@ -117,7 +147,7 @@ class PythonExec {
     try {
       await extract(zipPath, { dir: destDir });
       logInfo('Python extraction finished.');
-      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Environment extraction finished.', step: 'python-extract' });
+      this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Runtime libraries configured.', step: 'python-extract' });
     } catch (error) {
       logError(`Failed to extract Python: ${error}`);
       this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to extract environment.', step: 'python-extract' });
