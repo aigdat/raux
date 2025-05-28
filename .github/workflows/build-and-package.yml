@@ -102,9 +102,9 @@ jobs:
       - name: Extract CHANGELOG entry
         id: changelog
         run: |
-          pattern="## [v${{ needs.build-preparation.outputs.production_version }}]"
+          pattern="## \[${{ needs.build-preparation.outputs.production_version }}\]"
           content=$(cat CHANGELOG.md)
-          regex="(?s)$pattern(.*?)(?=\n## \[v|$)"
+          regex="(?s)$pattern(.*?)(?=\n## \[|$)"
           notes=$(echo "$content" | perl -0777 -ne "print $1 if /$regex/")
           if [ -z "$notes" ]; then
             notes="Release v${{ needs.build-preparation.outputs.production_version }}%0ANo release notes available."
