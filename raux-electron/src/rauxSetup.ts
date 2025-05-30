@@ -193,7 +193,7 @@ class RauxSetup {
     }
 
     this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Installing components!', step: 'raux-env' });
-    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: ' this may take 5 - 10 minutes...', step: 'raux-env' });
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Install may take 5 to 10 minutes...', step: 'raux-env' });
     
     for (const whlFile of whlFiles) {
       const wheelPath = path.join(extractDir, whlFile);
