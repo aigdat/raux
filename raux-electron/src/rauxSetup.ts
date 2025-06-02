@@ -218,7 +218,11 @@ class RauxSetup {
     for (const whlFile of whlFiles) {
       const wheelPath = path.join(extractDir, whlFile);
 
-      const result = await python.runPipCommand(['install', wheelPath, '--verbose', '--no-warn-script-location']);
+      // Use app-specific cache directory to avoid permission issues
+      const pipCacheDir = path.join(getAppInstallDir(), 'python', 'pip-cache');
+      mkdirSync(pipCacheDir, { recursive: true });
+      
+      const result = await python.runPipCommand(['install', wheelPath, '--cache-dir', pipCacheDir, '--verbose', '--no-warn-script-location']);
       
       if (result.code === 0) {
         logInfo(`${whlFile} installed successfully.`);
