@@ -1,10 +1,48 @@
 import { app } from 'electron';
 import { getAppInstallDir, getUserInstallDir } from './envUtils';
 import { rauxProcessManager } from './rauxProcessManager';
-import { rmSync, readFileSync, writeFileSync, existsSync } from 'fs';
-import { spawn } from 'child_process';
+import { rmSync, readFileSync, writeFileSync, existsSync, renameSync } from 'fs';
+import { spawn, exec } from 'child_process';
 import { logInfo } from './logger';
 import * as path from 'path';
+import * as os from 'os';
+
+/**
+ * Schedules a self-deleting Windows task to remove the GaiaBeta directory.
+ * The task runs once after a delay and then removes itself.
+ */
+function scheduleGaiaBetaCleanup(): void {
+  try {
+    const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+    const gaiaBetaDir = path.join(localAppData, 'GaiaBeta');
+    
+    // Create a unique task name
+    const taskName = `RAUX_Cleanup_${Date.now()}`;
+    
+    // PowerShell command to create a scheduled task that:
+    // 1. Waits 60 seconds after creation
+    // 2. Removes the GaiaBeta directory (silently)
+    // 3. Deletes itself from Task Scheduler (silently)
+    const psCommand = `
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-WindowStyle Hidden -Command \\"Start-Sleep -Seconds 5; Remove-Item -Path '${gaiaBetaDir}' -Recurse -Force -ErrorAction SilentlyContinue; Unregister-ScheduledTask -TaskName '${taskName}' -Confirm:\$false -ErrorAction SilentlyContinue\\""
+    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(60)
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DeleteExpiredTaskAfter 00:00:01
+    Register-ScheduledTask -TaskName "${taskName}" -Action $action -Trigger $trigger -Settings $settings -Force -ErrorAction SilentlyContinue
+    `.trim().replace(/\n/g, '; ');
+    
+    exec(`powershell -WindowStyle Hidden -Command "${psCommand}"`, (error, stdout, stderr) => {
+      if (error) {
+        // Only log to console since log file may be deleted during uninstall
+        console.error(`Error creating cleanup task: ${error.message}`);
+      } else {
+        console.log(`Created self-deleting cleanup task: ${taskName}`);
+      }
+    });
+  } catch (e) {
+    // Only log to console since log file may be deleted during uninstall
+    console.error(`Error scheduling GaiaBeta cleanup: ${e}`);
+  }
+}
 
 function cleanupRauxInstallation(): void {
   try {
@@ -25,8 +63,21 @@ function cleanupRauxInstallation(): void {
     logInfo(`Removing user data dir: ${userDir}`);
     rmSync(userDir, { recursive: true, force: true });
     
-    // Note: Desktop shortcut and the parent GaiaBeta directory will be 
-    // cleaned up by Squirrel's uninstaller automatically
+    // Explicitly remove desktop shortcut since Squirrel isn't doing it automatically
+    try {
+      const updateExe = path.resolve(process.execPath, '..', '..', 'Update.exe');
+      const exeName = 'raux.exe';
+      logInfo('Removing desktop shortcut...');
+      spawn(updateExe, ['--removeShortcut', exeName], { detached: true });
+    } catch (e) {
+      logInfo(`Error removing shortcut: ${e}`);
+    }
+    
+    // Schedule cleanup of the GaiaBeta directory since Squirrel doesn't always clean it up
+    scheduleGaiaBetaCleanup();
+    
+    // Note: The parent GaiaBeta directory should be cleaned up by Squirrel's 
+    // uninstaller automatically after this process exits, but we schedule a backup cleanup
     app.quit();
   } catch (e) {
     logInfo(`Error during cleanup: ${e}`);

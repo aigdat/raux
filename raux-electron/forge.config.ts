@@ -10,6 +10,7 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 import { mainConfig } from './webpack.main.config';
 import { rendererConfig } from './webpack.renderer.config';
+import * as path from 'path';
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -28,7 +29,8 @@ const config: ForgeConfig = {
       name: 'GaiaBeta',
       exe: 'raux.exe',
       setupExe: 'raux-setup.exe',
-      setupIcon: 'static/favicon.ico'
+      setupIcon: path.join(__dirname, 'static', 'favicon.ico'),
+      iconUrl: 'https://raw.githubusercontent.com/aigdat/raux/main/raux-electron/static/favicon.ico'
     }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({}),
