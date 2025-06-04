@@ -24,7 +24,7 @@ function scheduleGaiaBetaCleanup(): void {
     // 2. Removes the GaiaBeta directory (silently)
     // 3. Deletes itself from Task Scheduler (silently)
     const psCommand = `
-    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-WindowStyle Hidden -Command \\"Start-Sleep -Seconds 5; Remove-Item -Path '${gaiaBetaDir}' -Recurse -Force -ErrorAction SilentlyContinue; Unregister-ScheduledTask -TaskName '${taskName}' -Confirm:\$false -ErrorAction SilentlyContinue\\""
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-WindowStyle Hidden -Command \`"Start-Sleep -Seconds 5; Remove-Item -Path '${gaiaBetaDir}' -Recurse -Force -ErrorAction SilentlyContinue; Unregister-ScheduledTask -TaskName '${taskName}' -Confirm:\`$false -ErrorAction SilentlyContinue\`""
     $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(60)
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DeleteExpiredTaskAfter 00:00:01
     Register-ScheduledTask -TaskName "${taskName}" -Action $action -Trigger $trigger -Settings $settings -Force -ErrorAction SilentlyContinue
