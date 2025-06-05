@@ -1,7 +1,6 @@
 import { BaseCliRunner, CliCommandResult, CliCommandOptions } from './baseCliRunner';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { createServer } from 'net';
-import { request } from 'http';
 import { logInfo, logError } from '../logger';
 
 export interface LemonadeVersion {
@@ -96,42 +95,64 @@ export class LemonadeClient extends BaseCliRunner {
         return { success: true };
       }
 
-      // Get default configuration and apply overrides
-      const config = this.getLemonadeServerConfig(options.envOverrides || {});
-      
-      // Check if port is available
-      const portNumber = parseInt(config.port, 10);
-      if (await this.isPortInUse(portNumber)) {
-        logError(`[LemonadeClient] Port ${portNumber} is already in use`);
-        return { success: false, error: `Port ${portNumber} is already in use` };
+      // Verify the command exists before attempting to spawn
+      logInfo(`[LemonadeClient] Verifying command exists: ${this.commandName}`);
+      const commandExists = await this.isLemonadeAvailable();
+      if (!commandExists) {
+        const error = `Command '${this.commandName}' not found or not executable`;
+        logError(`[LemonadeClient] ${error}`);
+        return { success: false, error };
       }
+
+      // Get configuration for port
+      const config = this.getLemonadeServerConfig(options.envOverrides || {});
+      const args = ['serve', '--port', config.port];
       
-      const args = [];
-      args.push('--host', config.host);
-      args.push('--port', config.port);
-
-      // Add any additional arguments from config (excluding callback functions and known config)
-      Object.entries(config).forEach(([key, value]) => {
-        if (key !== 'host' && key !== 'port' && value !== undefined) {
-          args.push(`--${key}`, String(value));
-        }
-      });
-
-      logInfo(`Starting Lemonade server process with args: ${args.join(' ')}`);
+      logInfo(`[LemonadeClient] Starting Lemonade server with args: ${args.join(' ')}`);
+      logInfo(`[LemonadeClient] Command: ${this.commandName}`);
+      logInfo(`[LemonadeClient] Working directory: ${process.cwd()}`);
+      logInfo(`[LemonadeClient] PATH: ${process.env.PATH}`);
       this.serverStatus = 'starting';
       
-      // Spawn the server process
-      this.serverProcess = spawn(this.commandName, args, {
-        stdio: 'pipe',
+      // Start the lemonade-server with serve command and port
+      const spawnOptions = {
+        stdio: 'pipe' as const,
         windowsHide: true,
-        env: { ...process.env }
+        env: { ...process.env, ...options.envOverrides }
+      };
+      
+      logInfo(`[LemonadeClient] Spawn options: ${JSON.stringify({ ...spawnOptions, env: Object.keys(spawnOptions.env).length + ' env vars' })}`);
+      
+      this.serverProcess = spawn(this.commandName, args, spawnOptions);
+
+      // Add immediate error handler before checking PID
+      this.serverProcess.on('error', (error: any) => {
+        logError(`[LemonadeClient] Spawn error immediately after creation: ${error.message}`);
+        logError(`[LemonadeClient] Error code: ${error.code}`);
+        logError(`[LemonadeClient] Error errno: ${error.errno}`);
+        logError(`[LemonadeClient] Error syscall: ${error.syscall}`);
+        logError(`[LemonadeClient] Error path: ${error.path}`);
+        logError(`[LemonadeClient] Error spawnfile: ${error.spawnfile}`);
+        this.serverStatus = 'crashed';
+        this.serverProcess = null;
       });
 
-      if (!this.serverProcess.pid) {
-        throw new Error('Failed to start Lemonade server process');
+      // Wait a brief moment for spawn to complete and potential immediate errors
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      if (!this.serverProcess || !this.serverProcess.pid) {
+        const error = 'Failed to start Lemonade server process - no PID assigned';
+        logError(`[LemonadeClient] ${error}`);
+        logError(`[LemonadeClient] serverProcess exists: ${!!this.serverProcess}`);
+        logError(`[LemonadeClient] serverProcess.killed: ${this.serverProcess?.killed}`);
+        logError(`[LemonadeClient] serverProcess.exitCode: ${this.serverProcess?.exitCode}`);
+        logError(`[LemonadeClient] serverProcess.signalCode: ${this.serverProcess?.signalCode}`);
+        this.serverStatus = 'crashed';
+        this.serverProcess = null;
+        return { success: false, error };
       }
 
-      logInfo(`Lemonade server started with PID: ${this.serverProcess.pid}`);
+      logInfo(`[LemonadeClient] Lemonade server started with PID: ${this.serverProcess.pid}`);
 
       // Set up event handlers
       this.serverProcess.stdout.on('data', (data) => {
@@ -231,26 +252,12 @@ export class LemonadeClient extends BaseCliRunner {
   public async startServer(options: { host?: string; port?: string; [key: string]: any } = {}): Promise<CliCommandResult> {
     logInfo('Warning: startServer is deprecated, use startServerProcess for managed processes');
     
-    const args = [];
+    const config = this.getLemonadeServerConfig();
+    const args = ['serve', '--port', options.port || config.port];
     
-    if (options.host) {
-      args.push('--host', options.host);
-    }
-    
-    if (options.port) {
-      args.push('--port', options.port);
-    }
-
-    // Add any additional arguments from options
-    Object.entries(options).forEach(([key, value]) => {
-      if (key !== 'host' && key !== 'port' && value !== undefined) {
-        args.push(`--${key}`, String(value));
-      }
-    });
-
     logInfo(`Starting Lemonade server with args: ${args.join(' ')}`);
     
-    // For server start, we want a longer timeout and persistent process
+    // Start the lemonade-server with serve command and port
     return await this.executeCommand(args, {
       timeout: 60000, // 60 seconds for startup
       ...options
@@ -286,7 +293,7 @@ export class LemonadeClient extends BaseCliRunner {
   public getLemonadeServerConfig(envOverrides: Record<string, string> = {}): Record<string, string> {
     const defaultConfig = {
       host: '0.0.0.0',
-      port: '8000',
+      port: '8080',
     };
 
     return {
