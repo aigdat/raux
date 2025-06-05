@@ -208,28 +208,45 @@ export class LemonadeClient extends BaseCliRunner {
   }
 
   /**
-   * Stop the managed Lemonade server process
+   * Stop the managed Lemonade server process using proper stop command
    */
-  public stopServerProcess(): void {
-    if (this.serverProcess) {
-      logInfo('Stopping Lemonade server process...');
+  public async stopServerProcess(): Promise<void> {
+    logInfo('[LemonadeClient] Stopping Lemonade server using stop command...');
+    
+    try {
+      // Use the proper lemonade-server stop command
+      const result = await this.executeCommand(['stop'], { timeout: 10000 });
       
-      try {
-        this.serverProcess.kill('SIGTERM');
+      if (result.success) {
+        logInfo('[LemonadeClient] Lemonade server stopped successfully via stop command');
+      } else {
+        logError(`[LemonadeClient] Stop command failed: ${result.error || result.stderr}`);
         
-        // Force kill after 5 seconds if not stopped gracefully
-        setTimeout(() => {
-          if (this.serverProcess) {
-            logInfo('Force killing Lemonade server process...');
-            this.serverProcess.kill('SIGKILL');
-          }
-        }, 5000);
-      } catch (error) {
-        logError(`Error stopping Lemonade server: ${error}`);
+        // Fallback to process kill if stop command fails
+        if (this.serverProcess) {
+          logInfo('[LemonadeClient] Falling back to process termination...');
+          this.serverProcess.kill('SIGTERM');
+          
+          setTimeout(() => {
+            if (this.serverProcess) {
+              logInfo('[LemonadeClient] Force killing Lemonade server process...');
+              this.serverProcess.kill('SIGKILL');
+            }
+          }, 3000);
+        }
+      }
+    } catch (error) {
+      logError(`[LemonadeClient] Error executing stop command: ${error}`);
+      
+      // Fallback to process kill if stop command throws
+      if (this.serverProcess) {
+        logInfo('[LemonadeClient] Falling back to process termination...');
+        this.serverProcess.kill('SIGTERM');
       }
     }
     
     this.serverStatus = 'stopped';
+    this.serverProcess = null;
   }
 
   /**

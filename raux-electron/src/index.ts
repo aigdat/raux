@@ -193,11 +193,11 @@ app.on('ready', createWindow);
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
   if (process.platform !== 'darwin') {
     // Stop services before quitting when window is closed
     logInfo('All windows closed - window-all-closed event');
-    stopServices();
+    await stopServices();
     app.quit();
   }
 });
@@ -205,7 +205,7 @@ app.on('window-all-closed', () => {
 // Track if we've already stopped services to avoid double cleanup
 let servicesStopped = false;
 
-const stopServices = () => {
+const stopServices = async () => {
   if (servicesStopped) return;
   
   logInfo('Stopping services...');
@@ -213,15 +213,15 @@ const stopServices = () => {
   
   // Stop both services
   rauxProcessManager.stopRaux();
-  lemonadeProcessManager.stopLemonade();
+  await lemonadeProcessManager.stopLemonade();
   
   logInfo('Services stopped');
 };
 
 // Handle app quit to gracefully shutdown services
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
   logInfo('Application shutting down - before-quit event');
-  stopServices();
+  await stopServices();
 });
 
 app.on('activate', () => {

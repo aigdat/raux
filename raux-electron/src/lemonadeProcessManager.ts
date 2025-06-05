@@ -176,9 +176,9 @@ class LemonadeProcessManager {
     }
   }
 
-  stopLemonade() {
+  async stopLemonade() {
     this.stopHealthCheck();
-    lemonadeClient.stopServerProcess();
+    await lemonadeClient.stopServerProcess();
   }
 
   getStatus() {
