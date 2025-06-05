@@ -294,7 +294,7 @@ export class LemonadeClient extends BaseCliRunner {
   public getLemonadeServerConfig(envOverrides: Record<string, string> = {}): Record<string, string> {
     const defaultConfig = {
       host: '0.0.0.0',
-      port: '8080',
+      port: '8000'
     };
 
     return {

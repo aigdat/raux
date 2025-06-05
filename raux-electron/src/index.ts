@@ -195,19 +195,33 @@ app.on('ready', createWindow);
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    // Stop services before quitting when window is closed
+    logInfo('All windows closed - window-all-closed event');
+    stopServices();
     app.quit();
   }
 });
 
-// Handle app quit to gracefully shutdown services
-app.on('before-quit', () => {
-  logInfo('Application shutting down - stopping services...');
+// Track if we've already stopped services to avoid double cleanup
+let servicesStopped = false;
+
+const stopServices = () => {
+  if (servicesStopped) return;
+  
+  logInfo('Stopping services...');
+  servicesStopped = true;
   
   // Stop both services
   rauxProcessManager.stopRaux();
   lemonadeProcessManager.stopLemonade();
   
-  logInfo('Services stopped, continuing shutdown');
+  logInfo('Services stopped');
+};
+
+// Handle app quit to gracefully shutdown services
+app.on('before-quit', () => {
+  logInfo('Application shutting down - before-quit event');
+  stopServices();
 });
 
 app.on('activate', () => {
