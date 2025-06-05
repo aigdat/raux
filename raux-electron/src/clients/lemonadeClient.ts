@@ -14,6 +14,7 @@ export class LemonadeClient extends BaseCliRunner {
   private static instance: LemonadeClient;
   private serverProcess: ChildProcessWithoutNullStreams | null = null;
   private serverStatus: 'starting' | 'running' | 'stopped' | 'crashed' = 'stopped';
+  private isStartedByRaux: boolean = false; // Track if RAUX started this process
 
   private constructor() {
     super('lemonade-server', {
@@ -154,6 +155,7 @@ export class LemonadeClient extends BaseCliRunner {
       }
 
       logInfo(`[LemonadeClient] Lemonade server started with PID: ${this.serverProcess.pid}`);
+      this.isStartedByRaux = true; // Mark that RAUX started this process
 
       // Set up event handlers
       this.serverProcess.stdout.on('data', (data) => {
@@ -209,9 +211,15 @@ export class LemonadeClient extends BaseCliRunner {
 
   /**
    * Stop the managed Lemonade server process using proper stop command
+   * Only stops if RAUX started the process
    */
   public async stopServerProcess(): Promise<void> {
-    logInfo('[LemonadeClient] Stopping Lemonade server using stop command...');
+    if (!this.isStartedByRaux) {
+      logInfo('[LemonadeClient] Lemonade server was not started by RAUX - skipping stop');
+      return;
+    }
+
+    logInfo('[LemonadeClient] Stopping Lemonade server using stop command (started by RAUX)...');
     
     try {
       // Use the proper lemonade-server stop command
@@ -247,6 +255,7 @@ export class LemonadeClient extends BaseCliRunner {
     
     this.serverStatus = 'stopped';
     this.serverProcess = null;
+    this.isStartedByRaux = false;
   }
 
   /**
@@ -261,6 +270,13 @@ export class LemonadeClient extends BaseCliRunner {
    */
   public isServerManaged(): boolean {
     return this.serverProcess !== null;
+  }
+
+  /**
+   * Check if the server was started by RAUX
+   */
+  public isServerStartedByRaux(): boolean {
+    return this.isStartedByRaux;
   }
 
   /**

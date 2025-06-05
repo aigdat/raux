@@ -193,11 +193,16 @@ class LemonadeProcessManager {
     return lemonadeClient.getLemonadeServerConfig();
   }
 
+  isStartedByRaux(): boolean {
+    return lemonadeClient.isServerStartedByRaux();
+  }
+
   async getInfo(): Promise<{ 
     status: string; 
     isManaged: boolean; 
     isRunning: boolean; 
     isAvailable: boolean;
+    isStartedByRaux: boolean;
     config: Record<string, string>;
   }> {
     return {
@@ -205,6 +210,7 @@ class LemonadeProcessManager {
       isManaged: this.isManaged(),
       isRunning: await this.isLemonadeRunning(),
       isAvailable: await this.isLemonadeAvailable(),
+      isStartedByRaux: this.isStartedByRaux(),
       config: this.getLemonadeConfig(),
     };
   }
