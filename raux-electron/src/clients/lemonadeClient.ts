@@ -118,6 +118,7 @@ export class LemonadeClient extends BaseCliRunner {
       const spawnOptions = {
         stdio: 'pipe' as const,
         windowsHide: true,
+        shell: true, // Required on Windows to find commands in PATH
         env: { ...process.env, ...options.envOverrides }
       };
       
