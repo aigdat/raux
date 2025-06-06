@@ -53,9 +53,11 @@ export class LemonadeClient extends BaseCliRunner {
    */
   public async isLemonadeAvailable(options: CliCommandOptions = {}): Promise<boolean> {
     try {
-      const result = await this.getVersion({ ...options, timeout: 5000 });
+      const result = await this.getVersion({ ...options, timeout: 10000 });
+      logInfo(`[LemonadeClient] Version check result: success=${result.success}, exitCode=${result.exitCode}, stdout="${result.stdout}", stderr="${result.stderr}"`);
       return result.success && !!result.version;
-    } catch {
+    } catch (error) {
+      logError(`[LemonadeClient] Exception during version check: ${error}`);
       return false;
     }
   }
