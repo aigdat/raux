@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import { logInfo, logError } from '../logger';
+import { getEnhancedEnvironment } from '../envUtils';
 
 export interface CliCommandResult {
   success: boolean;
@@ -43,12 +44,15 @@ export abstract class BaseCliRunner {
     logInfo(`Executing command: ${this.commandName} ${args.join(' ')}`);
 
     return new Promise((resolve) => {
+      // Get enhanced environment with user PATH
+      const enhancedEnv = getEnhancedEnvironment();
+      
       const proc: ChildProcess = spawn(this.commandName, args, {
         shell: mergedOptions.shell,
         timeout: mergedOptions.timeout,
         windowsHide: mergedOptions.windowsHide,
         cwd: mergedOptions.cwd,
-        env: { ...process.env, ...mergedOptions.env }
+        env: { ...enhancedEnv, ...mergedOptions.env }
       });
 
       let stdout = '';

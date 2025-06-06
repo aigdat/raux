@@ -2,6 +2,7 @@ import { BaseCliRunner, CliCommandResult, CliCommandOptions } from './baseCliRun
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { createServer } from 'net';
 import { logInfo, logError } from '../logger';
+import { getEnhancedEnvironment } from '../envUtils';
 
 export interface LemonadeVersion {
   full: string;
@@ -116,11 +117,12 @@ export class LemonadeClient extends BaseCliRunner {
       this.serverStatus = 'starting';
       
       // Start the lemonade-server with serve command and port
+      const enhancedEnv = getEnhancedEnvironment();
       const spawnOptions = {
         stdio: 'pipe' as const,
         windowsHide: true,
         shell: true, // Required on Windows to find commands in PATH
-        env: { ...process.env, ...options.envOverrides }
+        env: { ...enhancedEnv, ...options.envOverrides }
       };
       
       logInfo(`[LemonadeClient] Spawn options: ${JSON.stringify({ ...spawnOptions, env: Object.keys(spawnOptions.env).length + ' env vars' })}`);

@@ -6,6 +6,42 @@ import { logInfo, logError } from './logger';
 
 export const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === '1';
 
+// Get enhanced environment with user PATH for Windows
+export function getEnhancedEnvironment(): Record<string, string> {
+  const env = { ...process.env };
+  
+  // On Windows, Electron processes don't inherit full user PATH
+  // We need to get the user PATH from the registry
+  if (process.platform === 'win32') {
+    try {
+      // Try to get user PATH from Windows registry using reg command
+      const { execSync } = require('child_process');
+      const userPath = execSync('reg query "HKCU\\Environment" /v PATH', {
+        encoding: 'utf8',
+        timeout: 5000,
+        windowsHide: true
+      });
+      
+      // Parse the registry output to extract PATH value
+      const match = userPath.match(/PATH\s+REG_(?:EXPAND_)?SZ\s+(.+)/i);
+      if (match && match[1]) {
+        const userPathValue = match[1].trim();
+        logInfo(`[envUtils] Found user PATH: ${userPathValue}`);
+        
+        // Combine system PATH with user PATH
+        const currentPath = env.PATH || '';
+        env.PATH = `${userPathValue};${currentPath}`;
+        logInfo(`[envUtils] Enhanced PATH: ${env.PATH}`);
+      }
+    } catch (error) {
+      logError(`[envUtils] Failed to get user PATH from registry: ${error}`);
+      // Continue with existing PATH
+    }
+  }
+  
+  return env;
+}
+
 // Directory for app binaries and dependencies (Python, open-webui)
 export function getAppInstallDir() {
   if (isDev) {
