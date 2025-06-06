@@ -10,10 +10,14 @@ export const isDev = process.env.NODE_ENV === 'development' || process.env.ELECT
 export function getEnhancedEnvironment(): Record<string, string> {
   const env = { ...process.env };
   
+  logInfo(`[envUtils] Getting enhanced environment, platform: ${process.platform}`);
+  logInfo(`[envUtils] Current PATH: ${env.PATH}`);
+  
   // On Windows, Electron processes don't inherit full user PATH
   // We need to get the user PATH from the registry
   if (process.platform === 'win32') {
     try {
+      logInfo(`[envUtils] Querying Windows registry for user PATH...`);
       // Try to get user PATH from Windows registry using reg command
       const { execSync } = require('child_process');
       const userPath = execSync('reg query "HKCU\\Environment" /v PATH', {
@@ -21,6 +25,8 @@ export function getEnhancedEnvironment(): Record<string, string> {
         timeout: 5000,
         windowsHide: true
       });
+      
+      logInfo(`[envUtils] Registry query result: ${userPath}`);
       
       // Parse the registry output to extract PATH value
       const match = userPath.match(/PATH\s+REG_(?:EXPAND_)?SZ\s+(.+)/i);
@@ -32,6 +38,8 @@ export function getEnhancedEnvironment(): Record<string, string> {
         const currentPath = env.PATH || '';
         env.PATH = `${userPathValue};${currentPath}`;
         logInfo(`[envUtils] Enhanced PATH: ${env.PATH}`);
+      } else {
+        logInfo(`[envUtils] No user PATH found in registry output`);
       }
     } catch (error) {
       logError(`[envUtils] Failed to get user PATH from registry: ${error}`);
