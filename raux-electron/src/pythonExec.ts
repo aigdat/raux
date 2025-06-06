@@ -268,7 +268,7 @@ class PythonExec {
       proc.stderr.on('data', (data) => {
         stderr += data;
         if (isPipInstall) {
-          logError(`[pip] ${data.toString().trim()}`);
+          logInfo(`[pip] ${data.toString().trim()}`);
         }
       });
       
