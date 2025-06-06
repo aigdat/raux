@@ -1,4 +1,3 @@
-import { join } from 'path';
 import { request } from 'http';
 import { getAppInstallDir } from './envUtils';
 import { logInfo, logError } from './logger';

@@ -14,35 +14,63 @@ export function getEnhancedEnvironment(): Record<string, string> {
   logInfo(`[envUtils] Current PATH: ${env.PATH}`);
   
   // On Windows, Electron processes don't inherit full user PATH
-  // We need to get the user PATH from the registry
+  // We need to get both system and user PATH from the registry
   if (process.platform === 'win32') {
     try {
-      logInfo(`[envUtils] Querying Windows registry for user PATH...`);
-      // Try to get user PATH from Windows registry using reg command
       const { execSync } = require('child_process');
-      const userPath = execSync('reg query "HKCU\\Environment" /v PATH', {
-        encoding: 'utf8',
-        timeout: 5000,
-        windowsHide: true
-      });
+      let systemPath = '';
+      let userPathValue = '';
       
-      logInfo(`[envUtils] Registry query result: ${userPath}`);
-      
-      // Parse the registry output to extract PATH value
-      const match = userPath.match(/PATH\s+REG_(?:EXPAND_)?SZ\s+(.+)/i);
-      if (match && match[1]) {
-        const userPathValue = match[1].trim();
-        logInfo(`[envUtils] Found user PATH: ${userPathValue}`);
+      // First get system PATH from HKLM
+      try {
+        logInfo(`[envUtils] Querying Windows registry for system PATH...`);
+        const systemPathResult = execSync('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v PATH', {
+          encoding: 'utf8',
+          timeout: 5000,
+          windowsHide: true
+        });
         
-        // Combine system PATH with user PATH
-        const currentPath = env.PATH || '';
-        env.PATH = `${userPathValue};${currentPath}`;
+        const systemMatch = systemPathResult.match(/PATH\s+REG_(?:EXPAND_)?SZ\s+(.+)/i);
+        if (systemMatch && systemMatch[1]) {
+          systemPath = systemMatch[1].trim();
+          logInfo(`[envUtils] Found system PATH: ${systemPath}`);
+        }
+      } catch (sysError) {
+        logInfo(`[envUtils] Could not get system PATH: ${sysError}`);
+      }
+      
+      // Then get user PATH from HKCU
+      try {
+        logInfo(`[envUtils] Querying Windows registry for user PATH...`);
+        const userPathResult = execSync('reg query "HKCU\\Environment" /v PATH', {
+          encoding: 'utf8',
+          timeout: 5000,
+          windowsHide: true
+        });
+        
+        logInfo(`[envUtils] User PATH registry query result: ${userPathResult}`);
+        
+        const userMatch = userPathResult.match(/PATH\s+REG_(?:EXPAND_)?SZ\s+(.+)/i);
+        if (userMatch && userMatch[1]) {
+          userPathValue = userMatch[1].trim();
+          logInfo(`[envUtils] Found user PATH: ${userPathValue}`);
+        }
+      } catch (userError) {
+        logInfo(`[envUtils] Could not get user PATH: ${userError}`);
+      }
+      
+      // Combine paths: user PATH + system PATH + existing PATH (if any)
+      const currentPath = env.PATH || '';
+      const pathParts = [userPathValue, systemPath, currentPath].filter(p => p);
+      
+      if (pathParts.length > 0) {
+        env.PATH = pathParts.join(';');
         logInfo(`[envUtils] Enhanced PATH: ${env.PATH}`);
       } else {
-        logInfo(`[envUtils] No user PATH found in registry output`);
+        logInfo(`[envUtils] No PATH components found, keeping existing: ${currentPath}`);
       }
     } catch (error) {
-      logError(`[envUtils] Failed to get user PATH from registry: ${error}`);
+      logError(`[envUtils] Failed to get PATH from registry: ${error}`);
       // Continue with existing PATH
     }
   }
