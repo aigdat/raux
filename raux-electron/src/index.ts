@@ -40,15 +40,15 @@ const startServices = async (): Promise<void> => {
     
     if (shouldStartLemonade) {
       logInfo('Hybrid mode detected - starting Lemonade server...');
-      ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting Lemonade AI service...' });
+      ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Starting Lemonade Server...' });
       
       const lemonadeStarted = await lemonadeProcessManager.startLemonade();
       if (lemonadeStarted) {
         logInfo('Lemonade server started successfully');
-        ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Lemonade AI service ready.' });
+        ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Lemonade Server ready.' });
       } else {
         logInfo('Failed to start Lemonade server, continuing with RAUX only');
-        ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'warning', message: 'Lemonade unavailable - using Ollama mode.' });
+        ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'warning', message: 'Lemonade unavailable.' });
       }
     } else {
       logInfo('Generic mode - skipping Lemonade startup');
