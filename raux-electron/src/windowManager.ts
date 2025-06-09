@@ -73,6 +73,15 @@ export class WindowManager {
   }
 
   /**
+   * Update Lemonade status in the window (currently disabled but method exists for future use)
+   */
+  public updateLemonadeStatus(status: any): void {
+    // Method exists to satisfy interface but functionality is disabled
+    // Status monitoring logic remains active in the background
+    return;
+  }
+
+  /**
    * Inject the Lemonade status indicator into the page
    */
   private injectLemonadeStatusIndicator(): void {
