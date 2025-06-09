@@ -35,7 +35,7 @@ export class WindowManager {
       titleBarOverlay: {
         color: '#18181b',
         symbolColor: '#ffffff',
-        height: 32
+        height: 28
       },
       titleBarStyle: 'hidden',
       show: true,
@@ -222,4 +222,4 @@ export class WindowManager {
         };
     }
   }
-} 
+}

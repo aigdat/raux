@@ -8,8 +8,8 @@ export class LemonadeStatusMonitor extends EventEmitter {
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private currentStatus: LemonadeStatus;
   private isMonitoring: boolean = false;
-  private readonly HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
-  private readonly STARTUP_HEALTH_CHECK_INTERVAL = 5000; // 5 seconds during startup
+  private readonly HEALTH_CHECK_INTERVAL = 10000; // 10 seconds
+  private readonly STARTUP_HEALTH_CHECK_INTERVAL = 3000; // 3 seconds during startup
 
   private constructor() {
     super();
