@@ -41,8 +41,10 @@ export abstract class BaseCliRunner {
     const mergedOptions = { ...this.defaultOptions, ...options };
     
     logInfo(`Executing command: ${this.commandName} ${args.join(' ')}`);
+    logInfo(`Command options: timeout=${mergedOptions.timeout}ms, shell=${mergedOptions.shell}, cwd=${mergedOptions.cwd || 'default'}`);
 
     return new Promise((resolve) => {
+      const startTime = Date.now();
       const proc: ChildProcess = spawn(this.commandName, args, {
         shell: mergedOptions.shell,
         timeout: mergedOptions.timeout,
@@ -54,12 +56,30 @@ export abstract class BaseCliRunner {
       let stdout = '';
       let stderr = '';
       let timeoutId: NodeJS.Timeout | null = null;
+      let processResolved = false;
+
+      const resolveOnce = (result: CliCommandResult) => {
+        if (processResolved) return;
+        processResolved = true;
+        
+        const duration = Date.now() - startTime;
+        logInfo(`Command completed in ${duration}ms: ${this.commandName} ${args.join(' ')}`);
+        
+        if (timeoutId) clearTimeout(timeoutId);
+        resolve(result);
+      };
 
       // Set up timeout handling
       if (mergedOptions.timeout && mergedOptions.timeout > 0) {
         timeoutId = setTimeout(() => {
+          const duration = Date.now() - startTime;
+          logError(`Command '${this.commandName} ${args.join(' ')}' timed out after ${duration}ms (limit: ${mergedOptions.timeout}ms)`);
+          logError(`Stdout so far: ${stdout}`);
+          logError(`Stderr so far: ${stderr}`);
+          
           proc.kill('SIGTERM');
-          resolve({
+          
+          resolveOnce({
             success: false,
             exitCode: -1,
             stdout,
@@ -70,17 +90,23 @@ export abstract class BaseCliRunner {
       }
 
       proc.stdout?.on('data', (data) => {
-        stdout += data.toString();
+        const output = data.toString();
+        stdout += output;
+        logInfo(`[${this.commandName}][stdout] ${output.trim()}`);
       });
 
       proc.stderr?.on('data', (data) => {
-        stderr += data.toString();
+        const output = data.toString();
+        stderr += output;
+        logInfo(`[${this.commandName}][stderr] ${output.trim()}`);
       });
 
       proc.on('error', (error) => {
-        if (timeoutId) clearTimeout(timeoutId);
-        logError(`Command '${this.commandName}' failed: ${error.message}`);
-        resolve({
+        const duration = Date.now() - startTime;
+        logError(`Command '${this.commandName}' failed with error after ${duration}ms: ${error.message}`);
+        logError(`Error details: code=${error.code}, errno=${error.errno}, syscall=${error.syscall}`);
+        
+        resolveOnce({
           success: false,
           exitCode: -1,
           stdout,
@@ -90,7 +116,7 @@ export abstract class BaseCliRunner {
       });
 
       proc.on('close', (code) => {
-        if (timeoutId) clearTimeout(timeoutId);
+        const duration = Date.now() - startTime;
         
         const result: CliCommandResult = {
           success: code === 0,
@@ -100,15 +126,18 @@ export abstract class BaseCliRunner {
         };
 
         if (result.success) {
-          logInfo(`Command '${this.commandName}' completed successfully`);
+          logInfo(`Command '${this.commandName}' completed successfully after ${duration}ms`);
         } else {
-          logError(`Command '${this.commandName}' failed with exit code ${code}`);
+          logError(`Command '${this.commandName}' failed with exit code ${code} after ${duration}ms`);
           if (stderr) {
             logError(`stderr: ${stderr}`);
           }
+          if (stdout) {
+            logInfo(`stdout: ${stdout}`);
+          }
         }
 
-        resolve(result);
+        resolveOnce(result);
       });
     });
   }
