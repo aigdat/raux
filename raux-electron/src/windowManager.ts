@@ -35,7 +35,7 @@ export class WindowManager {
       titleBarOverlay: {
         color: '#18181b',
         symbolColor: '#ffffff',
-        height: 30
+        height: 32
       },
       titleBarStyle: 'hidden',
       show: true,
@@ -98,21 +98,27 @@ export class WindowManager {
     const css = `
       #lemonade-status-indicator {
         position: fixed;
-        top: 8px;
-        right: 120px; /* Position before window controls */
-        z-index: 9999;
-        background: rgba(0, 0, 0, 0.8);
+        top: 6px;
+        right: 140px;
+        z-index: 10000;
+        background: rgba(255, 255, 255, 0.1);
         color: white;
         padding: 4px 8px;
         border-radius: 4px;
-        font-size: 12px;
+        font-size: 11px;
         font-family: system-ui, sans-serif;
         pointer-events: none;
         user-select: none;
-        -webkit-app-region: no-drag;
         display: flex;
         align-items: center;
         gap: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        -webkit-app-region: no-drag;
+      }
+      
+      #lemonade-status-indicator:hover {
+        background: rgba(255, 255, 255, 0.15);
       }
     `;
 
