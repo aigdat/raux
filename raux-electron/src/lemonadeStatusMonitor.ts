@@ -137,7 +137,7 @@ export class LemonadeStatusMonitor extends EventEmitter {
   private async determineStatus(): Promise<LemonadeStatus> {
     const timestamp = Date.now();
 
-    // First, check if Lemonade CLI is available
+    // First, check if Lemonade CLI is available (for installation check only)
     const isAvailable = await lemonadeClient.isLemonadeAvailable();
     
     if (!isAvailable) {
@@ -149,55 +149,18 @@ export class LemonadeStatusMonitor extends EventEmitter {
       };
     }
 
-    // Get current process status from our client
-    const processStatus = lemonadeClient.getServerStatus();
+    // Use only the health endpoint to determine status
+    const healthCheck: LemonadeHealthCheck = await lemonadeClient.checkHealth(5000);
     
-    // Try CLI status command first
-    let cliStatus: string | null = null;
-    try {
-      const statusResult = await lemonadeClient.executeCommand(['status'], { timeout: 5000 });
-      if (statusResult.success && statusResult.stdout) {
-        cliStatus = statusResult.stdout.trim().toLowerCase();
-        logInfo(`[LemonadeStatusMonitor] CLI status: ${cliStatus}`);
-      }
-    } catch (error) {
-      logInfo(`[LemonadeStatusMonitor] CLI status command failed: ${error}`);
-    }
-    
-    // Perform health check
-    const healthCheck: LemonadeHealthCheck = await lemonadeClient.checkHealth(3000);
-    
-    // Determine overall status based on CLI status, process status, and health check
+    // Simple status determination based on health check
     let status: LemonadeStatus['status'];
     let error: string | undefined;
 
     if (healthCheck.isHealthy) {
-      // Health check passed - server is definitely running
       status = 'running';
-    } else if (cliStatus && cliStatus.includes('running')) {
-      // CLI says running but health check failed - might be starting up
-      status = 'starting';
-      error = 'Server starting up or health endpoint not ready';
-    } else if (cliStatus && (cliStatus.includes('stopped') || cliStatus.includes('not running'))) {
-      // CLI confirms server is stopped
-      status = 'stopped';
-      error = 'Server confirmed stopped via CLI';
-    } else if (processStatus === 'starting') {
-      // Our process manager thinks it's starting
-      status = 'starting';
-      error = 'Server starting up';
-    } else if (processStatus === 'crashed') {
-      // Our process manager detected a crash
-      status = 'crashed';
-      error = healthCheck.error || 'Server process crashed';
-    } else if (processStatus === 'stopped') {
-      // Our process manager says it's stopped
-      status = 'stopped';
-      error = healthCheck.error || 'Server not running';
     } else {
-      // Unclear state - health failed and no clear CLI status
       status = 'stopped';
-      error = healthCheck.error || 'Server not responding and status unclear';
+      error = healthCheck.error || 'Server not responding to health checks';
     }
 
     // Get version info if available (only for logging, not critical)
