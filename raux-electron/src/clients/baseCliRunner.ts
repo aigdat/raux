@@ -101,10 +101,10 @@ export abstract class BaseCliRunner {
         logInfo(`[${this.commandName}][stderr] ${output.trim()}`);
       });
 
-      proc.on('error', (error) => {
+      proc.on('error', (error: Error & { code?: string; errno?: string; syscall?: string }) => {
         const duration = Date.now() - startTime;
         logError(`Command '${this.commandName}' failed with error after ${duration}ms: ${error.message}`);
-        logError(`Error details: code=${error.code}, errno=${error.errno}, syscall=${error.syscall}`);
+        logError(`Error details: code=${error.code || 'unknown'}, errno=${error.errno || 'unknown'}, syscall=${error.syscall || 'unknown'}`);
         
         resolveOnce({
           success: false,

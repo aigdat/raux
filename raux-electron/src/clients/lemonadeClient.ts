@@ -244,13 +244,13 @@ export class LemonadeClient extends BaseCliRunner {
       this.serverProcess = spawn(this.commandName, args, spawnOptions);
 
       // Add immediate error handler before checking PID
-      this.serverProcess.on('error', (error: any) => {
+      this.serverProcess.on('error', (error: Error & { code?: string; errno?: string; syscall?: string; path?: string; spawnfile?: string }) => {
         logError(`[LemonadeClient] Spawn error immediately after creation: ${error.message}`);
-        logError(`[LemonadeClient] Error code: ${error.code}`);
-        logError(`[LemonadeClient] Error errno: ${error.errno}`);
-        logError(`[LemonadeClient] Error syscall: ${error.syscall}`);
-        logError(`[LemonadeClient] Error path: ${error.path}`);
-        logError(`[LemonadeClient] Error spawnfile: ${error.spawnfile}`);
+        logError(`[LemonadeClient] Error code: ${error.code || 'unknown'}`);
+        logError(`[LemonadeClient] Error errno: ${error.errno || 'unknown'}`);
+        logError(`[LemonadeClient] Error syscall: ${error.syscall || 'unknown'}`);
+        logError(`[LemonadeClient] Error path: ${error.path || 'unknown'}`);
+        logError(`[LemonadeClient] Error spawnfile: ${error.spawnfile || 'unknown'}`);
         this.serverStatus = 'crashed';
         this.serverProcess = null;
       });
