@@ -137,7 +137,54 @@ export class LemonadeStatusMonitor extends EventEmitter {
   private async determineStatus(): Promise<LemonadeStatus> {
     const timestamp = Date.now();
 
-    // First, check if Lemonade CLI is available
+    // Perform health check first - this is the primary indicator of server status
+    const healthCheck: LemonadeHealthCheck = await lemonadeClient.checkHealth();
+    
+    if (healthCheck.isHealthy) {
+      // Server is responding to health checks - it's running
+      return {
+        status: 'running',
+        isHealthy: true,
+        timestamp,
+        port: lemonadeClient.getLemonadeServerConfig().port,
+      };
+    }
+
+    // Health check failed - determine why
+    const processStatus = lemonadeClient.getServerStatus();
+    
+    // Check if we have a managed process
+    if (lemonadeClient.isServerManaged()) {
+      // We're managing the process, so trust the process status
+      if (processStatus === 'starting') {
+        return {
+          status: 'starting',
+          isHealthy: false,
+          timestamp,
+          error: 'Server starting up',
+          port: lemonadeClient.getLemonadeServerConfig().port,
+        };
+      } else if (processStatus === 'crashed') {
+        return {
+          status: 'crashed',
+          isHealthy: false,
+          timestamp,
+          error: healthCheck.error || 'Server process crashed',
+          port: lemonadeClient.getLemonadeServerConfig().port,
+        };
+      } else if (processStatus === 'stopped') {
+        return {
+          status: 'stopped',
+          isHealthy: false,
+          timestamp,
+          error: 'Server not running',
+          port: lemonadeClient.getLemonadeServerConfig().port,
+        };
+      }
+    }
+
+    // No managed process, but health check failed
+    // Check if Lemonade CLI is even available
     const isAvailable = await lemonadeClient.isLemonadeAvailable();
     
     if (!isAvailable) {
@@ -149,54 +196,13 @@ export class LemonadeStatusMonitor extends EventEmitter {
       };
     }
 
-    // Get current process status
-    const processStatus = lemonadeClient.getServerStatus();
-    
-    // Perform health check
-    const healthCheck: LemonadeHealthCheck = await lemonadeClient.checkHealth();
-    
-    // Determine overall status based on process status and health check
-    let status: LemonadeStatus['status'];
-    let error: string | undefined;
-
-    if (healthCheck.isHealthy) {
-      status = 'running';
-    } else if (processStatus === 'starting') {
-      status = 'starting';
-      error = 'Server starting up';
-    } else if (processStatus === 'crashed') {
-      status = 'crashed';
-      error = healthCheck.error || 'Server process crashed';
-    } else if (processStatus === 'stopped') {
-      status = 'stopped';
-      error = healthCheck.error || 'Server not running';
-    } else {
-      // Process thinks it's running but health check failed
-      status = 'crashed';
-      error = healthCheck.error || 'Server not responding to health checks';
-    }
-
-    // Get version info if available
-    let version: string | undefined;
-    try {
-      const versionResult = await lemonadeClient.getVersion({ timeout: 2000 });
-      if (versionResult.success && versionResult.version) {
-        version = versionResult.version.full;
-      }
-    } catch {
-      // Version check failed, but that's not critical for status
-    }
-
-    // Get port configuration
-    const config = lemonadeClient.getLemonadeServerConfig();
-    
+    // CLI is available but server not responding - assume stopped
     return {
-      status,
-      isHealthy: healthCheck.isHealthy,
+      status: 'stopped',
+      isHealthy: false,
       timestamp,
-      error,
-      version,
-      port: config.port,
+      error: healthCheck.error || 'Server not responding to health checks',
+      port: lemonadeClient.getLemonadeServerConfig().port,
     };
   }
 

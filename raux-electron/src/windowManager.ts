@@ -32,12 +32,6 @@ export class WindowManager {
         contextIsolation: true,
         nodeIntegration: false,
       },
-      titleBarOverlay: {
-        color: '#18181b',
-        symbolColor: '#ffffff',
-        height: 28
-      },
-      titleBarStyle: 'hidden',
       show: true,
     });
 
@@ -67,11 +61,9 @@ export class WindowManager {
     if (this.mainWindow) {
       this.mainWindow.loadURL(RAUX_URL);
       
-      // Inject Lemonade status indicator after the web app loads
+      // Restore Lemonade status in title after the web app loads and potentially changes it
       this.mainWindow.webContents.once('did-finish-load', () => {
-        this.injectLemonadeStatusIndicator();
-        
-        // Get current status and update the indicator
+        // Get current status and update the title
         const { lemonadeStatusMonitor } = require('./lemonadeStatusMonitor');
         const currentStatus = lemonadeStatusMonitor.getCurrentStatus();
         this.updateLemonadeStatus(currentStatus);
@@ -90,136 +82,49 @@ export class WindowManager {
   }
 
   /**
-   * Inject the Lemonade status indicator into the page
-   */
-  private injectLemonadeStatusIndicator(): void {
-    if (!this.mainWindow) return;
-
-    const css = `
-      #lemonade-status-indicator {
-        position: fixed;
-        top: 6px;
-        right: 140px;
-        z-index: 10000;
-        background: rgba(255, 255, 255, 0.1);
-        color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 11px;
-        font-family: system-ui, sans-serif;
-        pointer-events: none;
-        user-select: none;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        backdrop-filter: blur(10px);
-        -webkit-app-region: no-drag;
-      }
-      
-      #lemonade-status-indicator:hover {
-        background: rgba(255, 255, 255, 0.15);
-      }
-    `;
-
-    const html = `
-      <div id="lemonade-status-indicator">
-        <span id="lemonade-status-icon">⚫</span>
-        <span id="lemonade-status-text">Unknown</span>
-      </div>
-    `;
-
-    this.mainWindow.webContents.insertCSS(css);
-    this.mainWindow.webContents.executeJavaScript(`
-      if (!document.getElementById('lemonade-status-indicator')) {
-        document.body.insertAdjacentHTML('beforeend', \`${html}\`);
-      }
-    `);
-  }
-
-  /**
-   * Update Lemonade status indicator
+   * Update window title with Lemonade status
    */
   public updateLemonadeStatus(status: LemonadeStatus): void {
     if (!this.mainWindow) {
       return;
     }
 
-    const { icon, text, color } = this.formatStatusForIndicator(status);
+    const statusText = this.formatStatusForTitle(status);
+    const newTitle = `${this.baseTitle} • ${statusText}`;
     
-    this.mainWindow.webContents.executeJavaScript(`
-      const indicator = document.getElementById('lemonade-status-indicator');
-      const iconEl = document.getElementById('lemonade-status-icon');
-      const textEl = document.getElementById('lemonade-status-text');
-      
-      if (indicator && iconEl && textEl) {
-        iconEl.textContent = '${icon}';
-        textEl.textContent = '${text}';
-        indicator.style.background = 'rgba(0, 0, 0, 0.8)';
-        indicator.style.border = '1px solid ${color}';
-      }
-    `);
+    this.mainWindow.setTitle(newTitle);
   }
 
   /**
-   * Clear Lemonade status indicator
+   * Clear Lemonade status from title (show just base title)
    */
   public clearLemonadeStatus(): void {
     if (!this.mainWindow) {
       return;
     }
 
-    this.mainWindow.webContents.executeJavaScript(`
-      const indicator = document.getElementById('lemonade-status-indicator');
-      if (indicator) {
-        indicator.remove();
-      }
-    `);
+    this.mainWindow.setTitle(this.baseTitle);
   }
 
   /**
-   * Format status for display in indicator
+   * Format status for display in window title
    */
-  private formatStatusForIndicator(status: LemonadeStatus): { icon: string; text: string; color: string } {
+  private formatStatusForTitle(status: LemonadeStatus): string {
     const { status: state, isHealthy } = status;
     
     switch (state) {
       case 'running':
-        return { 
-          icon: '🟢', 
-          text: 'Running', 
-          color: '#22c55e' 
-        };
+        return isHealthy ? '🟢 Lemonade Running' : '🟡 Lemonade Issues';
       case 'starting':
-        return { 
-          icon: '🟡', 
-          text: 'Starting', 
-          color: '#f59e0b' 
-        };
+        return '🟡 Lemonade Starting';
       case 'stopped':
-        return { 
-          icon: '🔴', 
-          text: 'Stopped', 
-          color: '#ef4444' 
-        };
+        return '🔴 Lemonade Stopped';
       case 'crashed':
-        return { 
-          icon: '🔴', 
-          text: 'Crashed', 
-          color: '#ef4444' 
-        };
+        return '🔴 Lemonade Crashed';
       case 'unavailable':
-        return { 
-          icon: '⚫', 
-          text: 'Unavailable', 
-          color: '#6b7280' 
-        };
+        return '⚫ Lemonade Unavailable';
       default:
-        return { 
-          icon: '❓', 
-          text: 'Unknown', 
-          color: '#6b7280' 
-        };
+        return '❓ Lemonade Unknown';
     }
   }
 }
