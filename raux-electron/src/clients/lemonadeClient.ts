@@ -2,6 +2,7 @@ import { BaseCliRunner, CliCommandResult, CliCommandOptions } from './baseCliRun
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { createServer } from 'net';
 import { logInfo, logError } from '../logger';
+import { LemonadeHealthCheck } from '../ipc/ipcTypes';
 
 export interface LemonadeVersion {
   full: string;
@@ -52,10 +53,120 @@ export class LemonadeClient extends BaseCliRunner {
    */
   public async isLemonadeAvailable(options: CliCommandOptions = {}): Promise<boolean> {
     try {
-      const result = await this.getVersion({ ...options, timeout: 5000 });
-      return result.success && !!result.version;
-    } catch {
+      logInfo('[LemonadeClient] Checking if Lemonade is available...');
+      
+      // First try a quick version check with extended timeout and environment override to suppress warnings
+      const envOptions = {
+        ...options,
+        timeout: 15000,
+        env: {
+          ...options.env,
+          // Suppress the pkg_resources deprecation warning that might cause hangs
+          PYTHONWARNINGS: 'ignore::DeprecationWarning'
+        }
+      };
+      
+      const result = await this.getVersion(envOptions);
+      if (result.success && !!result.version) {
+        logInfo(`[LemonadeClient] Lemonade available - version: ${result.version?.full}`);
+        return true;
+      }
+      
+      logInfo(`[LemonadeClient] Version check failed - trying alternative detection methods`);
+      logInfo(`[LemonadeClient] Version result: success=${result.success}, exitCode=${result.exitCode}, error=${result.error}`);
+      
+      // If version check fails, try a help command as fallback
+      const helpResult = await this.executeCommand(['--help'], { ...envOptions, timeout: 10000 });
+      if (helpResult.success || helpResult.exitCode === 0) {
+        logInfo('[LemonadeClient] Lemonade available via help command');
+        return true;
+      }
+      
+      logInfo(`[LemonadeClient] Help command also failed: success=${helpResult.success}, exitCode=${helpResult.exitCode}`);
+      
+      // Last resort: try without any arguments (some commands show help when no args)
+      const noArgsResult = await this.executeCommand([], { ...envOptions, timeout: 8000 });
+      if (noArgsResult.success || (noArgsResult.stderr && noArgsResult.stderr.includes('lemonade'))) {
+        logInfo('[LemonadeClient] Lemonade available via no-args detection');
+        return true;
+      }
+      
+      logInfo('[LemonadeClient] All detection methods failed - Lemonade not available');
       return false;
+    } catch (error) {
+      logError(`[LemonadeClient] Exception checking Lemonade availability: ${error}`);
+      return false;
+    }
+  }
+
+  /**
+   * Check Lemonade server health using the Health API
+   */
+  public async checkHealth(timeoutMs: number = 5000): Promise<LemonadeHealthCheck> {
+    const startTime = Date.now();
+    
+    try {
+      const config = this.getLemonadeServerConfig();
+      const healthUrl = `http://localhost:${config.port}/api/v0/health`;
+      
+      // Use fetch with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      
+      const response = await fetch(healthUrl, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      
+      clearTimeout(timeoutId);
+      const responseTime = Date.now() - startTime;
+      
+      if (response.ok) {
+        return {
+          isHealthy: true,
+          responseTime,
+          timestamp: Date.now(),
+        };
+      }
+
+      return {
+        isHealthy: false,
+        responseTime,
+        error: `HTTP ${response.status}: ${response.statusText}`,
+        timestamp: Date.now(),
+      };
+      
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          return {
+            isHealthy: false,
+            responseTime,
+            error: `Health check timeout after ${timeoutMs}ms`,
+            timestamp: Date.now(),
+          };
+        }
+        
+        return {
+          isHealthy: false,
+          responseTime,
+          error: error.message,
+          timestamp: Date.now(),
+        };
+      
+      }
+
+      return {
+        isHealthy: false,
+        responseTime,
+        error: 'Unknown error during health check',
+        timestamp: Date.now(),
+      };
     }
   }
 
@@ -120,7 +231,12 @@ export class LemonadeClient extends BaseCliRunner {
         stdio: 'pipe' as const,
         windowsHide: true,
         shell: true, // Required on Windows to find commands in PATH
-        env: { ...process.env, ...options.envOverrides }
+        env: { 
+          ...process.env, 
+          ...options.envOverrides,
+          // Suppress warnings that might interfere with startup
+          PYTHONWARNINGS: 'ignore::DeprecationWarning'
+        }
       };
       
       logInfo(`[LemonadeClient] Spawn options: ${JSON.stringify({ ...spawnOptions, env: Object.keys(spawnOptions.env).length + ' env vars' })}`);
@@ -128,13 +244,13 @@ export class LemonadeClient extends BaseCliRunner {
       this.serverProcess = spawn(this.commandName, args, spawnOptions);
 
       // Add immediate error handler before checking PID
-      this.serverProcess.on('error', (error: any) => {
+      this.serverProcess.on('error', (error: Error & { code?: string; errno?: string; syscall?: string; path?: string; spawnfile?: string }) => {
         logError(`[LemonadeClient] Spawn error immediately after creation: ${error.message}`);
-        logError(`[LemonadeClient] Error code: ${error.code}`);
-        logError(`[LemonadeClient] Error errno: ${error.errno}`);
-        logError(`[LemonadeClient] Error syscall: ${error.syscall}`);
-        logError(`[LemonadeClient] Error path: ${error.path}`);
-        logError(`[LemonadeClient] Error spawnfile: ${error.spawnfile}`);
+        logError(`[LemonadeClient] Error code: ${error.code || 'unknown'}`);
+        logError(`[LemonadeClient] Error errno: ${error.errno || 'unknown'}`);
+        logError(`[LemonadeClient] Error syscall: ${error.syscall || 'unknown'}`);
+        logError(`[LemonadeClient] Error path: ${error.path || 'unknown'}`);
+        logError(`[LemonadeClient] Error spawnfile: ${error.spawnfile || 'unknown'}`);
         this.serverStatus = 'crashed';
         this.serverProcess = null;
       });

@@ -1,64 +1,129 @@
-// ... existing code ...
-
-# Auto-Launch Prevention Plan
+# Lemonade Status Indicator Implementation Plan
 
 ## Overview
-Implement a mechanism to prevent RAUX Electron app from automatically launching after installation when installed via GAIA's NSIS installer, while still allowing auto-launch when self-installed.
+Implement visible status indicators for Lemonade server in the RAUX Electron app UI to provide users with real-time feedback about Lemonade availability and health.
 
 ## Problem Statement
-- RAUX should auto-launch after self-installation (default Squirrel installer behavior from Electron Forge)
-- RAUX should NOT auto-launch when installed via GAIA's NSIS installer
-- Since GAIA (NSIS) invokes RAUX (Squirrel), we need coordination between different installer systems
+- The backend already has comprehensive Lemonade status monitoring (`lemonadeStatusMonitor`, `lemonadeClient`)
+- Status updates are being sent via IPC channel `lemonade:status`
+- The loading page and main UI are NOT displaying Lemonade status information
+- Users have no visual indication of Lemonade server status (running, stopped, error, etc.)
 
-## Installer Architecture Context
-- **GAIA**: Uses NSIS installer (traditional Windows installer)
-- **RAUX**: Uses Squirrel installer from Electron Forge (auto-launches by default)
-- **Flow**: GAIA NSIS → downloads raux-wheel-context.zip → invokes RAUX Squirrel installer → Squirrel auto-launches app
+## Current Backend Implementation (COMPLETED)
+✅ **Status Monitoring**: `lemonadeStatusMonitor.ts` - Monitors health and status
+✅ **IPC Communication**: Sends status updates via `LEMONADE_STATUS` channel
+✅ **Window Title Updates**: Shows status in window title bar
+✅ **Health Checks**: Regular health checks via `/api/v0/health` endpoint
+✅ **Process Management**: Start/stop Lemonade server processes
 
-## Approach
-Use a temporary file as a flag to control auto-launch behavior:
-1. GAIA NSIS installer creates a flag file in user's temp directory before invoking RAUX Squirrel installer
-2. RAUX Squirrel installer installs and auto-launches the app (default Squirrel behavior)
-3. RAUX app checks for flag file at startup
-4. RAUX removes the file if found and then exits immediately 
+## Missing Frontend Implementation
+❌ **Loading Page**: Not listening to `lemonade:status` IPC channel
+❌ **Status Display**: No visual indicator for Lemonade status in UI
+❌ **Status Messages**: Lemonade status not shown in status messages area
 
-## Tasks
+## Implementation Plan
 
-### 1. Modify RAUX Electron App
-- [x] Add temp file check early in the application lifecycle
-- [x] If the flag file exists, exit the application immediately
-- [x] Place check before any initialization or window creation
-- [x] If the file is found, RAUX will remove it
-- [x] RAUX will exit immediately after
+### 1. Update Loading Page Status Display
+**File**: `raux-electron/src/pages/loading/loading.html`
 
-### 2. Update GAIA NSIS Installer
-- [ ] Add code to create flag file in temp directory before invoking RAUX installer
-- [ ] Document this behavior for future maintenance
+- [ ] Add `lemonade:status` to the IPC channel listeners array
+- [ ] Create Lemonade-specific status message handling
+- [ ] Add visual indicators for Lemonade status (icon, color coding)
+- [ ] Include Lemonade status in the status messages area
 
-### 3. Testing
-- [ ] Test RAUX self-installation (should auto-launch)
-- [ ] Test RAUX installation via NSIS (should not auto-launch)
-- [ ] Test manual RAUX launch after NSIS installation (should launch)
+**Example Status Messages**:
+```
+- "Checking Lemonade availability..."
+- "Lemonade Server: Starting..."
+- "Lemonade Server: Ready ✓"
+- "Lemonade Server: Unavailable (Generic mode)"
+- "Lemonade Server: Error - Check connection"
+```
+
+### 2. Add Lemonade Status Icon/Badge
+**Location**: Loading page status area
+
+- [ ] Add a dedicated Lemonade status indicator section
+- [ ] Use color coding: Green (healthy), Yellow (starting), Red (error), Gray (unavailable)
+- [ ] Show status text with appropriate styling
+- [ ] Position near other status information
+
+### 3. Enhance Status Message Formatting
+**Enhancement**: Better visual hierarchy for different service statuses
+
+- [ ] Categorize messages by service (RAUX vs Lemonade)
+- [ ] Use different styling for different message types
+- [ ] Add icons or badges for different services
+- [ ] Implement status persistence (show last known status)
+
+### 4. Testing Scenarios
+- [ ] **Generic Mode**: Verify "Lemonade unavailable" message appears
+- [ ] **Hybrid Mode**: Verify Lemonade startup sequence is visible
+- [ ] **Health Check Failures**: Verify error states are displayed
+- [ ] **Status Transitions**: Verify status changes are reflected in real-time
 
 ## Implementation Details
 
-### RAUX Implementation (COMPLETED)
-1. **Location**: `raux-electron/src/envUtils.ts`
-   - Created `checkAndHandleAutoLaunchPrevention()` function
-   - Checks for `RAUX_PREVENT_AUTOLAUNCH` file in temp directory
-   - Removes the file if found
-   - Returns true to signal the app should exit
+### Required Code Changes
 
-2. **Integration**: `raux-electron/src/index.ts`
-   - Calls `checkAndHandleAutoLaunchPrevention()` early (line 23)
-   - Exits immediately with `process.exit(0)` if flag detected (line 24)
-   - This occurs BEFORE:
-     - Any window creation
-     - Squirrel event handling
-     - Installation processes
-     - Any UI initialization
+#### 1. Loading Page IPC Listener Update
+**File**: `raux-electron/src/pages/loading/loading.html` (line ~190)
 
-3. **Behavior**:
-   - First launch (with flag): Detects → Removes → Exits silently
-   - Second launch (no flag): Proceeds normally with installation
-   - No windows shown or installation performed when flag is present
+Current:
+```javascript
+['installation:status', 'installation:progress', 'installation:error'].forEach(channel => {
+```
+
+Updated:
+```javascript
+['installation:status', 'installation:progress', 'installation:error', 'lemonade:status'].forEach(channel => {
+```
+
+#### 2. Lemonade Status Message Handler
+**File**: `raux-electron/src/pages/loading/loading.html`
+
+Add specialized handling for `lemonade:status` messages:
+```javascript
+window.ipc?.on('lemonade:status', (status) => {
+  if (status) {
+    const message = formatLemonadeStatus(status);
+    messages.push({ type: 'lemonade', message });
+    renderMessages();
+  }
+});
+```
+
+#### 3. Status Formatting Function
+Add function to format Lemonade status appropriately:
+```javascript
+function formatLemonadeStatus(status) {
+  const icon = status.isHealthy ? '✓' : '⚠';
+  const statusText = status.status.charAt(0).toUpperCase() + status.status.slice(1);
+  return `Lemonade Server: ${statusText} ${icon}`;
+}
+```
+
+### Backend Status Types (Reference)
+**From**: `ipc/ipcTypes.ts`
+```typescript
+export interface LemonadeStatus {
+  status: 'unknown' | 'unavailable' | 'starting' | 'running' | 'stopping' | 'stopped' | 'error';
+  isHealthy: boolean;
+  lastHealthCheck?: LemonadeHealthCheck;
+  processManaged: boolean;
+  timestamp: number;
+}
+```
+
+## Success Criteria
+- [ ] Loading page shows Lemonade status messages in real-time
+- [ ] Users can see when Lemonade is starting, running, or unavailable
+- [ ] Error states are clearly communicated to users
+- [ ] Status updates appear in the status messages area
+- [ ] Visual indicators help distinguish between RAUX and Lemonade status
+
+## Notes
+- Backend implementation is already complete and robust
+- Only frontend display changes are needed
+- Changes should be minimal and focused on the loading page UI
+- Consider adding status indicators to other parts of UI in future iterations

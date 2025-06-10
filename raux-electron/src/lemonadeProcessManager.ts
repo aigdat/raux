@@ -1,5 +1,3 @@
-import { existsSync, appendFileSync, openSync } from 'fs';
-import { join } from 'path';
 import { request } from 'http';
 import { getAppInstallDir } from './envUtils';
 import { logInfo, logError } from './logger';
@@ -12,16 +10,13 @@ class LemonadeProcessManager {
   private static readonly HEALTH_CHECK_TIMEOUT_MS = 2000; // 2 seconds
   private static readonly RESTART_DELAY_MS = 5000; // 5 seconds
 
-  private logPath: string;
   private restartAttempts = 0;
   private healthCheckInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     const installDir = getAppInstallDir();
-    this.logPath = join(installDir, 'lemonade.log');
     
     logInfo(`[LemonadeProcessManager] installDir: ${installDir}`);
-    logInfo(`[LemonadeProcessManager] logPath: ${this.logPath}`);
   }
 
   async isLemonadeAvailable(): Promise<boolean> {
@@ -80,23 +75,17 @@ class LemonadeProcessManager {
 
 
       logInfo('[LemonadeProcessManager] Starting Lemonade server...');
-      
-      // Ensure log file exists
-      if (!existsSync(this.logPath)) openSync(this.logPath, 'w');
 
       // Configure server options
       const serverOptions = {
         envOverrides,
         onStdout: (data: string) => {
-          appendFileSync(this.logPath, data);
           logInfo(`[LemonadeProcessManager][stdout] ${data.trim()}`);
         },
         onStderr: (data: string) => {
-          appendFileSync(this.logPath, data);
           logError(`[LemonadeProcessManager][stderr] ${data.trim()}`);
         },
         onExit: (code: number | null) => {
-          appendFileSync(this.logPath, `\nLemonade process exited with code ${code}\n`);
           logError(`[LemonadeProcessManager] Lemonade process exited with code ${code}`);
           this.stopHealthCheck();
 
