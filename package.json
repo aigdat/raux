@@ -5,7 +5,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "npm run pyodide:fetch && vite dev --host",
-		"dev:5050": "npm run pyodide:fetch && vite dev --port 5050",
+		"dev:8080": "npm run pyodide:fetch && vite dev --port 8080",
 		"build": "npm run pyodide:fetch && vite build",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
