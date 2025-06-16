@@ -3,6 +3,7 @@ import { join } from 'path';
 import { IPCManager } from './ipc/ipcManager';
 import { getRendererPath } from './envUtils';
 import { LemonadeStatus } from './ipc/ipcTypes';
+import { logInfo, logError } from './logger';
 
 const RAUX_URL = 'http://localhost:8080';
 const LOADING_PAGE = getRendererPath('pages', 'loading', 'loading.html');
@@ -159,34 +160,41 @@ export class WindowManager {
       }
       
       #lemonade-status-indicator:hover {
-        opacity: 0.9;
+        background: rgba(0, 0, 0, 0.95);
+        transform: translateY(1px);
       }
 
       .lemonade-status-dot {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
         transition: all 0.3s ease;
+        flex-shrink: 0;
       }
 
       .lemonade-status-dot.green {
-        background-color: #4CAF50;
-        box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+        background-color: #22c55e;
+        box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
       }
 
       .lemonade-status-dot.red {
-        background-color: #F44336;
-        box-shadow: 0 0 8px rgba(244, 67, 54, 0.6);
+        background-color: #ef4444;
+        box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
       }
 
       .lemonade-status-dot.yellow {
-        background-color: #FFC107;
-        box-shadow: 0 0 8px rgba(255, 193, 7, 0.6);
+        background-color: #f59e0b;
+        box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
       }
 
       .lemonade-status-dot.gray {
-        background-color: #666;
-        box-shadow: 0 0 8px rgba(102, 102, 102, 0.6);
+        background-color: #6b7280;
+        box-shadow: 0 0 6px rgba(107, 114, 128, 0.6);
+      }
+
+      #lemonade-status-text {
+        font-weight: 500;
+        white-space: nowrap;
       }
     `;
 
@@ -197,12 +205,65 @@ export class WindowManager {
       </div>
     `;
 
+    // Inject CSS
     this.mainWindow.webContents.insertCSS(css);
-    this.mainWindow.webContents.executeJavaScript(`
-      if (!document.getElementById('lemonade-status-indicator')) {
-        document.body.insertAdjacentHTML('beforeend', \`${html}\`);
+    
+    // Inject HTML with retry mechanism
+    this.injectIndicatorWithRetry(html, 0);
+  }
+
+  /**
+   * Inject indicator with retry mechanism to handle timing issues
+   */
+  private injectIndicatorWithRetry(html: string, attempt: number): void {
+    if (!this.mainWindow || attempt >= 5) {
+      if (attempt >= 5) {
+        logError('[WindowManager] Failed to inject Lemonade status indicator after 5 attempts');
       }
-    `);
+      return;
+    }
+
+    this.mainWindow.webContents.executeJavaScript(`
+      (function() {
+        // Check if indicator already exists
+        if (document.getElementById('lemonade-status-indicator')) {
+          return { success: true, reason: 'already_exists' };
+        }
+        
+        // Check if document body is ready
+        if (!document.body) {
+          return { success: false, reason: 'body_not_ready' };
+        }
+        
+        // Inject the indicator
+        try {
+          document.body.insertAdjacentHTML('beforeend', \`${html}\`);
+          const indicator = document.getElementById('lemonade-status-indicator');
+          return { 
+            success: !!indicator, 
+            reason: indicator ? 'injected' : 'injection_failed' 
+          };
+        } catch (error) {
+          return { success: false, reason: 'injection_error', error: error.message };
+        }
+      })();
+    `).then((result: any) => {
+      if (result.success) {
+        logInfo(`[WindowManager] Lemonade status indicator ${result.reason === 'already_exists' ? 'already exists' : 'injected successfully'}`);
+      } else {
+        logInfo(`[WindowManager] Injection attempt ${attempt + 1} failed: ${result.reason}`);
+        // Retry after a delay
+        setTimeout(() => {
+          this.injectIndicatorWithRetry(html, attempt + 1);
+        }, 500);
+      }
+    }).catch((error) => {
+      logError(`[WindowManager] Error during injection attempt ${attempt + 1}: ${error}`);
+      // Retry after a delay
+      setTimeout(() => {
+        this.injectIndicatorWithRetry(html, attempt + 1);
+      }, 500);
+    });
   }
 
   /**
@@ -214,21 +275,45 @@ export class WindowManager {
     const { color, text, tooltip } = this.getStatusDisplay(status);
 
     this.mainWindow.webContents.executeJavaScript(`
-      const indicator = document.getElementById('lemonade-status-indicator');
-      const dot = document.getElementById('lemonade-status-dot');
-      const textElement = document.getElementById('lemonade-status-text');
-      
-      if (indicator && dot && textElement) {
-        // Update dot color
-        dot.className = 'lemonade-status-dot ${color}';
+      (function() {
+        const indicator = document.getElementById('lemonade-status-indicator');
+        const dot = document.getElementById('lemonade-status-dot');
+        const textElement = document.getElementById('lemonade-status-text');
         
-        // Update text
-        textElement.textContent = '${text}';
-        
-        // Update tooltip
-        indicator.title = '${tooltip}';
+        if (indicator && dot && textElement) {
+          // Update dot color
+          dot.className = 'lemonade-status-dot ${color}';
+          
+          // Update text
+          textElement.textContent = '${text}';
+          
+          // Update tooltip
+          indicator.title = \`${tooltip.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
+          
+          return { success: true };
+        } else {
+          return { 
+            success: false, 
+            missing: {
+              indicator: !indicator,
+              dot: !dot,
+              text: !textElement
+            }
+          };
+        }
+      })();
+    `).then((result: any) => {
+      if (!result.success) {
+        logInfo(`[WindowManager] Status indicator update failed - missing elements: ${JSON.stringify(result.missing)}`);
+        // Try to re-inject the indicator if it's missing
+        if (result.missing.indicator) {
+          logInfo('[WindowManager] Re-injecting status indicator...');
+          this.injectLemonadeStatusIndicator();
+        }
       }
-    `);
+    }).catch((error) => {
+      logError(`[WindowManager] Error updating status indicator: ${error}`);
+    });
   }
 
   /**
