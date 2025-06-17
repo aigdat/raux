@@ -45,6 +45,101 @@ export class WindowManager {
     
     this.mainWindow.on('close', () => this.destroyIcps());
     this.mainWindow.on('closed', () => this.destroyIcps());
+    
+    // Add event listeners to handle page refreshes and navigation
+    this.setupPageNavigationHandlers();
+  }
+
+  /**
+   * Setup event handlers for page navigation and refresh
+   */
+  private setupPageNavigationHandlers(): void {
+    if (!this.mainWindow) return;
+
+    // Handle page refresh - reinject indicator when page reloads
+    this.mainWindow.webContents.on('did-start-navigation', (event, url) => {
+      logInfo(`[WindowManager] Page navigation started to: ${url}`);
+    });
+
+    this.mainWindow.webContents.on('did-finish-load', () => {
+      logInfo('[WindowManager] Page finished loading - injecting status indicator');
+      this.injectLemonadeStatusIndicator();
+      this.injectStatusUpdateListener();
+      this.setupRefreshPrevention();
+      
+      // Update with current status if available
+      if (this.currentLemonadeStatus) {
+        this.updateStatusIndicator(this.currentLemonadeStatus);
+      }
+    });
+
+    // Handle navigation within the app
+    this.mainWindow.webContents.on('did-navigate', (event, url) => {
+      logInfo(`[WindowManager] Page navigated to: ${url}`);
+      // Reinject indicator after navigation
+      setTimeout(() => {
+        this.injectLemonadeStatusIndicator();
+        this.injectStatusUpdateListener();
+        if (this.currentLemonadeStatus) {
+          this.updateStatusIndicator(this.currentLemonadeStatus);
+        }
+      }, 100);
+    });
+
+    // Handle in-page navigation (like hash changes)
+    this.mainWindow.webContents.on('did-navigate-in-page', (event, url) => {
+      logInfo(`[WindowManager] In-page navigation to: ${url}`);
+      // Check if indicator still exists, if not reinject
+      setTimeout(() => {
+        this.checkAndReinjectIndicator();
+      }, 100);
+    });
+  }
+
+  /**
+   * Setup refresh prevention mechanism
+   */
+  private setupRefreshPrevention(): void {
+    if (!this.mainWindow) return;
+
+    this.mainWindow.webContents.executeJavaScript(`
+      // Override the default refresh behavior
+      document.addEventListener('keydown', function(e) {
+        // Prevent F5 and Ctrl+R
+        if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
+          e.preventDefault();
+          console.log('Page refresh prevented');
+          return false;
+        }
+      });
+
+      // Prevent context menu refresh option
+      document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+      });
+    `);
+  }
+
+  /**
+   * Check if indicator exists and reinject if needed
+   */
+  private checkAndReinjectIndicator(): void {
+    if (!this.mainWindow) return;
+
+    this.mainWindow.webContents.executeJavaScript(`
+      document.getElementById('lemonade-status-indicator') ? true : false
+    `).then((indicatorExists: boolean) => {
+      if (!indicatorExists) {
+        logInfo('[WindowManager] Status indicator missing - reinjecting');
+        this.injectLemonadeStatusIndicator();
+        this.injectStatusUpdateListener();
+        if (this.currentLemonadeStatus) {
+          this.updateStatusIndicator(this.currentLemonadeStatus);
+        }
+      }
+    }).catch((error) => {
+      logError(`[WindowManager] Error checking indicator existence: ${error}`);
+    });
   }
 
   public showLoadingPage(): void {
@@ -62,15 +157,7 @@ export class WindowManager {
   public showMainApp(): void {
     if (this.mainWindow) {
       this.mainWindow.loadURL(RAUX_URL);
-      // Inject status indicator after loading main app
-      this.mainWindow.webContents.once('did-finish-load', () => {
-        this.injectLemonadeStatusIndicator();
-        this.injectStatusUpdateListener();
-        // Update with current status if available
-        if (this.currentLemonadeStatus) {
-          this.updateStatusIndicator(this.currentLemonadeStatus);
-        }
-      });
+      // Note: The injection is now handled by the did-finish-load event in setupPageNavigationHandlers
     }
   }
 
@@ -136,6 +223,9 @@ export class WindowManager {
   private injectLemonadeStatusIndicator(): void {
     if (!this.mainWindow) return;
 
+    // Lemon SVG encoded as data URI - we'll use different colors for different states
+    const lemonSvgTemplate = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" style="width: 20px; height: 20px;"><path fill="#5C913B" d="M11.405 3.339c6.48-1.275 8.453 1.265 11.655.084 3.202-1.181.093 2.82-.745 3.508-.84.688-8.141 4.809-11.307 3.298-3.166-1.511-3.182-6.186.397-6.89z"/><path fill="#77B255" d="M15.001 16c-.304 0-.605-.138-.801-.4-.687-.916-1.308-1.955-1.965-3.056C9.967 8.749 7.396 4.446.783 2.976c-.539-.12-.879-.654-.654-1.193.12-.54.654-.878 1.193-.759C8.671 2.68 11.599 7.581 13.952 11.519c.63 1.054 1.224 2.049 1.848 2.881.332.442.242 1.069-.2 1.4-.18.135-.39.2-.599.2z"/><path fill="LEMON_COLOR" d="M34.3 31.534c.002-.017-.003-.028-.003-.043 2.774-5.335 2.647-15.113-3.346-21.107-5.801-5.8-13.68-5.821-18.767-4.067-1.579.614-2.917.066-3.815.965-.881.881-.351 2.719-.714 3.819-3.169 5.202-3.405 13.025 2.688 19.117 4.962 4.962 10.438 6.842 19.98 4.853.002-.002.005-.001.008-.002 1.148-.218 2.95.523 3.566-.094 1.085-1.085.309-2.358.403-3.441z"/><path fill="#77B255" d="M8.208 6.583s-4.27-.59-6.857 4.599c-2.587 5.188.582 9.125.29 12.653-.293 3.53 1.566 1.265 2.621-.445s4.23-4.895 4.938-9.269c.707-4.376-.07-6.458-.992-7.538z"/></svg>`;
+
     const css = `
       #lemonade-status-indicator {
         position: fixed;
@@ -152,56 +242,57 @@ export class WindowManager {
         user-select: none;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.1);
-        transition: opacity 0.3s ease;
+        transition: opacity 0.3s ease, transform 0.2s ease;
       }
       
       #lemonade-status-indicator:hover {
         background: rgba(0, 0, 0, 0.95);
-        transform: translateY(1px);
+        transform: translateY(-1px);
       }
 
-      .lemonade-status-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
+      .lemonade-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
         transition: all 0.3s ease;
         flex-shrink: 0;
       }
 
-      .lemonade-status-dot.green {
-        background-color: #22c55e;
-        box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+      .lemonade-icon.running {
+        filter: hue-rotate(0deg) saturate(1) brightness(1);
       }
 
-      .lemonade-status-dot.red {
-        background-color: #ef4444;
-        box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+      .lemonade-icon.stopped {
+        filter: grayscale(1) brightness(0.7);
       }
 
-      .lemonade-status-dot.yellow {
-        background-color: #f59e0b;
-        box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+      .lemonade-icon.starting {
+        filter: hue-rotate(45deg) saturate(1.2) brightness(1.1);
+        animation: pulse 1.5s ease-in-out infinite;
       }
 
-      .lemonade-status-dot.gray {
-        background-color: #6b7280;
-        box-shadow: 0 0 6px rgba(107, 114, 128, 0.6);
+      .lemonade-icon.error {
+        filter: hue-rotate(0deg) saturate(1.5) brightness(0.8);
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
       }
 
       #lemonade-status-text {
-        font-weight: 500;
-        white-space: nowrap;
+        display: none;
       }
     `;
 
     const html = `
       <div id="lemonade-status-indicator" title="Lemonade Server Status">
-        <span class="lemonade-status-dot gray" id="lemonade-status-dot"></span>
-        <span id="lemonade-status-text">Checking...</span>
+        <div class="lemonade-icon stopped" id="lemonade-icon">${lemonSvgTemplate.replace('LEMON_COLOR', '#FFCC4D')}</div>
+        <span id="lemonade-status-text" style="display: none;">Checking...</span>
       </div>
     `;
 
@@ -272,20 +363,16 @@ export class WindowManager {
   private updateStatusIndicator(status: LemonadeStatus): void {
     if (!this.mainWindow) return;
 
-    const { color, text, tooltip } = this.getStatusDisplay(status);
+    const { iconClass, tooltip } = this.getStatusDisplay(status);
 
     this.mainWindow.webContents.executeJavaScript(`
       (function() {
         const indicator = document.getElementById('lemonade-status-indicator');
-        const dot = document.getElementById('lemonade-status-dot');
-        const textElement = document.getElementById('lemonade-status-text');
+        const icon = document.getElementById('lemonade-icon');
         
-        if (indicator && dot && textElement) {
-          // Update dot color
-          dot.className = 'lemonade-status-dot ${color}';
-          
-          // Update text
-          textElement.textContent = '${text}';
+        if (indicator && icon) {
+          // Update icon class for styling
+          icon.className = 'lemonade-icon ${iconClass}';
           
           // Update tooltip
           indicator.title = \`${tooltip.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
@@ -296,8 +383,7 @@ export class WindowManager {
             success: false, 
             missing: {
               indicator: !indicator,
-              dot: !dot,
-              text: !textElement
+              icon: !icon
             }
           };
         }
@@ -319,49 +405,43 @@ export class WindowManager {
   /**
    * Get display properties for status
    */
-  private getStatusDisplay(status: LemonadeStatus): { color: string; text: string; tooltip: string } {
+  private getStatusDisplay(status: LemonadeStatus): { iconClass: string; tooltip: string } {
     const timestamp = new Date(status.timestamp).toLocaleTimeString();
     
     switch (status.status) {
       case 'running':
         return {
-          color: status.isHealthy ? 'green' : 'yellow',
-          text: status.isHealthy ? 'Running' : 'Issues',
+          iconClass: status.isHealthy ? 'running' : 'error',
           tooltip: `Lemonade Server: ${status.isHealthy ? 'Running normally' : 'Running with issues'}${status.version ? ` (v${status.version})` : ''}${status.port ? ` on port ${status.port}` : ''}\nLast checked: ${timestamp}${status.error ? `\nError: ${status.error}` : ''}`
         };
       
       case 'starting':
         return {
-          color: 'yellow',
-          text: 'Starting',
+          iconClass: 'starting',
           tooltip: `Lemonade Server: Starting up\nLast checked: ${timestamp}`
         };
       
       case 'stopped':
         return {
-          color: 'red',
-          text: 'Stopped',
+          iconClass: 'stopped',
           tooltip: `Lemonade Server: Stopped\nLast checked: ${timestamp}${status.error ? `\nReason: ${status.error}` : ''}`
         };
       
       case 'crashed':
         return {
-          color: 'red',
-          text: 'Crashed',
+          iconClass: 'error',
           tooltip: `Lemonade Server: Crashed\nLast checked: ${timestamp}${status.error ? `\nError: ${status.error}` : ''}`
         };
       
       case 'unavailable':
         return {
-          color: 'gray',
-          text: 'Unavailable',
+          iconClass: 'stopped',
           tooltip: `Lemonade Server: Not available\nLast checked: ${timestamp}${status.error ? `\nReason: ${status.error}` : ''}`
         };
       
       default:
         return {
-          color: 'gray',
-          text: 'Unknown',
+          iconClass: 'stopped',
           tooltip: `Lemonade Server: Unknown status\nLast checked: ${timestamp}`
         };
     }
@@ -383,49 +463,41 @@ export class WindowManager {
             if (status) {
               // Update the visual indicator
               const indicator = document.getElementById('lemonade-status-indicator');
-              const dot = document.getElementById('lemonade-status-dot');
-              const textElement = document.getElementById('lemonade-status-text');
+              const icon = document.getElementById('lemonade-icon');
               
-              if (indicator && dot && textElement) {
+              if (indicator && icon) {
                 // Determine display properties
-                let color, text, tooltip;
+                let iconClass, tooltip;
                 const timestamp = new Date(status.timestamp).toLocaleTimeString();
                 
                 switch (status.status) {
                   case 'running':
-                    color = status.isHealthy ? 'green' : 'yellow';
-                    text = status.isHealthy ? 'Running' : 'Issues';
+                    iconClass = status.isHealthy ? 'running' : 'error';
                     tooltip = \`Lemonade Server: \${status.isHealthy ? 'Running normally' : 'Running with issues'}\${status.version ? \` (v\${status.version})\` : ''}\${status.port ? \` on port \${status.port}\` : ''}\\nLast checked: \${timestamp}\${status.error ? \`\\nError: \${status.error}\` : ''}\`;
                     break;
                   case 'starting':
-                    color = 'yellow';
-                    text = 'Starting';
+                    iconClass = 'starting';
                     tooltip = \`Lemonade Server: Starting up\\nLast checked: \${timestamp}\`;
                     break;
                   case 'stopped':
-                    color = 'red';
-                    text = 'Stopped';
+                    iconClass = 'stopped';
                     tooltip = \`Lemonade Server: Stopped\\nLast checked: \${timestamp}\${status.error ? \`\\nReason: \${status.error}\` : ''}\`;
                     break;
                   case 'crashed':
-                    color = 'red';
-                    text = 'Crashed';
+                    iconClass = 'error';
                     tooltip = \`Lemonade Server: Crashed\\nLast checked: \${timestamp}\${status.error ? \`\\nError: \${status.error}\` : ''}\`;
                     break;
                   case 'unavailable':
-                    color = 'gray';
-                    text = 'Unavailable';
+                    iconClass = 'stopped';
                     tooltip = \`Lemonade Server: Not available\\nLast checked: \${timestamp}\${status.error ? \`\\nReason: \${status.error}\` : ''}\`;
                     break;
                   default:
-                    color = 'gray';
-                    text = 'Unknown';
+                    iconClass = 'stopped';
                     tooltip = \`Lemonade Server: Unknown status\\nLast checked: \${timestamp}\`;
                 }
                 
                 // Update the indicator
-                dot.className = 'lemonade-status-dot ' + color;
-                textElement.textContent = text;
+                icon.className = 'lemonade-icon ' + iconClass;
                 indicator.title = tooltip;
               }
             }
