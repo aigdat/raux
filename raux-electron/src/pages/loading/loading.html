@@ -194,7 +194,7 @@
     }
 
     // Listen for all relevant channels
-    ['installation:status', 'installation:progress', 'installation:error', 'lemonade:status'].forEach(channel => {
+    ['installation:status', 'installation:progress', 'installation:error'].forEach(channel => {
       window.ipc?.on(channel, (msg) => {
         if (msg && msg.message) {
           messages.push(msg);
@@ -203,43 +203,7 @@
       });
     });
 
-    // Special handling for lemonade:status messages with proper formatting
-    window.ipc?.on('lemonade:status', (status) => {
-      if (status) {
-        const message = formatLemonadeStatus(status);
-        const msgObj = { type: 'info', message };
-        messages.push(msgObj);
-        renderMessages();
-      }
-    });
-
-    // Format Lemonade status messages
-    function formatLemonadeStatus(status) {
-      const timestamp = new Date(status.timestamp).toLocaleTimeString();
-      let icon = '⚠️';
-      let statusText = status.status.charAt(0).toUpperCase() + status.status.slice(1);
-      
-      switch (status.status) {
-        case 'running':
-          icon = status.isHealthy ? '✅' : '⚠️';
-          statusText = status.isHealthy ? 'Running' : 'Running (Issues)';
-          break;
-        case 'starting':
-          icon = '🔄';
-          break;
-        case 'stopped':
-          icon = '🔴';
-          break;
-        case 'crashed':
-          icon = '💥';
-          break;
-        case 'unavailable':
-          icon = '❌';
-          break;
-      }
-      
-      return `Lemonade Server: ${statusText} ${icon}`;
-    }
+    // Remove the lemonade status handling - this will be handled by the main app indicator
 
     // Optionally, scroll to bottom on new message
     const statusObserver = new MutationObserver(() => {

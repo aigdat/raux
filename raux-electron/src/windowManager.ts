@@ -229,8 +229,8 @@ export class WindowManager {
     const css = `
       #lemonade-status-indicator {
         position: fixed;
-        bottom: 15px;
-        right: 15px;
+        bottom: 2px;
+        right: 25px;
         z-index: 10000;
         background: rgba(0, 0, 0, 0.9);
         color: white;
@@ -243,7 +243,7 @@ export class WindowManager {
         display: flex;
         align-items: center;
         gap: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        box-shadow: none;
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.1);
         transition: opacity 0.3s ease, transform 0.2s ease;
