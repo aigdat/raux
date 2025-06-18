@@ -69,7 +69,14 @@ export class WindowManager {
       if (currentURL && !currentURL.includes('loading.html')) {
         logInfo('[WindowManager] Non-loading page loaded - ensuring status indicator presence');
         this.setupRefreshPrevention();
-        this.ensureIndicatorPresent();
+        
+        // Add a small delay to ensure DOM is fully ready
+        setTimeout(() => {
+          logInfo('[WindowManager] Starting indicator injection after DOM ready delay');
+          this.ensureIndicatorPresent();
+        }, 500);
+      } else {
+        logInfo('[WindowManager] Loading page detected, skipping indicator injection');
       }
     });
 
@@ -122,20 +129,44 @@ export class WindowManager {
   private ensureIndicatorPresent(): void {
     if (!this.mainWindow) return;
 
+    logInfo('[WindowManager] ensureIndicatorPresent() called - checking DOM elements');
+
     this.mainWindow.webContents.executeJavaScript(`
       (function() {
         const indicator = document.getElementById('lemonade-status-indicator');
         const navElement = document.querySelector('nav');
         const controlsElement = navElement ? navElement.querySelector('[aria-label="Controls"]') : null;
         
+        // Debug: Get details about the nav element and its aria-label children
+        const navInfo = navElement ? {
+          tagName: navElement.tagName,
+          className: navElement.className,
+          id: navElement.id,
+          childrenCount: navElement.children.length,
+          ariaLabelsInNav: Array.from(navElement.querySelectorAll('[aria-label]')).map(el => ({
+            tagName: el.tagName,
+            ariaLabel: el.getAttribute('aria-label'),
+            className: el.className,
+            id: el.id
+          }))
+        } : null;
+        
         return {
           indicatorExists: !!indicator,
           navExists: !!navElement,
           controlsExists: !!controlsElement,
-          indicatorInCorrectLocation: indicator && controlsElement && controlsElement.parentElement && controlsElement.parentElement.contains(indicator) && controlsElement.previousElementSibling === indicator
+          indicatorInCorrectLocation: indicator && controlsElement && controlsElement.parentElement && controlsElement.parentElement.contains(indicator) && controlsElement.previousElementSibling === indicator,
+          debug: {
+            navInfo: navInfo,
+            documentReady: document.readyState,
+            bodyExists: !!document.body,
+            ariaLabelsInNavCount: navInfo ? navInfo.ariaLabelsInNav.length : 0
+          }
         };
       })();
     `).then((result: any) => {
+      logInfo(`[WindowManager] DOM Check Results: ${JSON.stringify(result, null, 2)}`);
+      
       if (!result.indicatorExists || !result.indicatorInCorrectLocation) {
         if (result.navExists && result.controlsExists) {
           logInfo('[WindowManager] Status indicator missing or in wrong location - ensuring presence');
@@ -152,8 +183,21 @@ export class WindowManager {
             this.updateStatusIndicator(this.currentLemonadeStatus);
           }
         } else {
-          logInfo('[WindowManager] Nav or controls element not found yet - will retry later');
+          logError(`[WindowManager] Required elements not found - Nav: ${result.navExists}, Controls: ${result.controlsExists}`);
+          if (result.debug.navInfo) {
+            logInfo(`[WindowManager] Nav found but missing controls. Nav has ${result.debug.ariaLabelsInNavCount} aria-labels: ${JSON.stringify(result.debug.navInfo.ariaLabelsInNav)}`);
+          } else {
+            logInfo(`[WindowManager] No nav element found in DOM`);
+          }
+          
+          // Try again after a longer delay
+          setTimeout(() => {
+            logInfo('[WindowManager] Retrying ensureIndicatorPresent after 2 seconds...');
+            this.ensureIndicatorPresent();
+          }, 2000);
         }
+      } else {
+        logInfo('[WindowManager] Indicator already exists and is in correct location');
       }
     }).catch((error) => {
       logError(`[WindowManager] Error ensuring indicator presence: ${error}`);
