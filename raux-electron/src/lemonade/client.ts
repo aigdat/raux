@@ -38,15 +38,25 @@ export class LemonadeClient extends BaseCliRunner {
 	public async getVersion(
 		options: CliCommandOptions = {}
 	): Promise<CliCommandResult & { version?: LemonadeVersion }> {
-		logInfo('Getting Lemonade version...');
+		logInfo('[LemonadeClient] Getting Lemonade version...');
 
 		const result = await this.executeCommand(['--version'], options);
 
+		logInfo(`[LemonadeClient] Version command result: success=${result.success}, exitCode=${result.exitCode}`);
+		logInfo(`[LemonadeClient] Version stdout: "${result.stdout || '(empty)'}"`);
+		logInfo(`[LemonadeClient] Version stderr: "${result.stderr || '(empty)'}"`);
+
 		if (result.success && result.stdout) {
 			const version = this.parseVersion(result.stdout);
+			if (version) {
+				logInfo(`[LemonadeClient] Successfully parsed version: ${version.full}`);
+			} else {
+				logError('[LemonadeClient] Failed to parse version from stdout');
+			}
 			return { ...result, version };
 		}
 
+		logError(`[LemonadeClient] Version command failed: ${result.error || 'Unknown error'}`);
 		return result;
 	}
 
@@ -181,19 +191,61 @@ export class LemonadeClient extends BaseCliRunner {
 	 * Parse version string from Lemonade output
 	 */
 	private parseVersion(output: string): LemonadeVersion | undefined {
-		const match = output.match(/([0-9]+)\.([0-9]+)\.([0-9]+)/);
+		logInfo(`[LemonadeClient] Parsing version from output: "${output.trim()}"`);
+		
+		// Try to match semantic version pattern (x.y.z)
+		let match = output.match(/([0-9]+)\.([0-9]+)\.([0-9]+)/);
 		if (match) {
 			const major = parseInt(match[1], 10);
 			const minor = parseInt(match[2], 10);
 			const patch = parseInt(match[3], 10);
 
-			return {
+			const version = {
 				full: `${major}.${minor}.${patch}`,
 				major,
 				minor,
 				patch
 			};
+			logInfo(`[LemonadeClient] Parsed semantic version: ${version.full}`);
+			return version;
 		}
+		
+		// Try to match version with additional parts (x.y.z.w or x.y.z-something)
+		match = output.match(/([0-9]+)\.([0-9]+)\.([0-9]+)(?:[.-].*)?/);
+		if (match) {
+			const major = parseInt(match[1], 10);
+			const minor = parseInt(match[2], 10);
+			const patch = parseInt(match[3], 10);
+
+			const version = {
+				full: `${major}.${minor}.${patch}`,
+				major,
+				minor,
+				patch
+			};
+			logInfo(`[LemonadeClient] Parsed extended version: ${version.full}`);
+			return version;
+		}
+		
+		// Try to extract any version-like pattern from the output
+		match = output.match(/version.*?([0-9]+(?:\.[0-9]+)*)/i);
+		if (match) {
+			const versionStr = match[1];
+			const parts = versionStr.split('.').map(p => parseInt(p, 10));
+			
+			if (parts.length >= 3) {
+				const version = {
+					full: `${parts[0]}.${parts[1]}.${parts[2]}`,
+					major: parts[0],
+					minor: parts[1],
+					patch: parts[2]
+				};
+				logInfo(`[LemonadeClient] Parsed from text version: ${version.full}`);
+				return version;
+			}
+		}
+		
+		logError(`[LemonadeClient] Could not parse version from output: "${output.trim()}"`);
 		return undefined;
 	}
 

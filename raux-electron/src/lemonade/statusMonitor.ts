@@ -167,12 +167,15 @@ export class LemonadeStatusMonitor extends EventEmitter {
 		// Get version info if available (only for logging, not critical)
 		let version: string | undefined;
 		try {
-			const versionResult = await lemonadeClient.getVersion({ timeout: 2000 });
+			const versionResult = await lemonadeClient.getVersion({ timeout: 5000 });
 			if (versionResult.success && versionResult.version) {
 				version = versionResult.version.full;
+				logInfo(`[LemonadeStatusMonitor] Version detected: ${version}`);
+			} else {
+				logInfo(`[LemonadeStatusMonitor] Version check failed: success=${versionResult.success}, stdout="${versionResult.stdout}", stderr="${versionResult.stderr}", error="${versionResult.error}"`);
 			}
-		} catch {
-			// Version check failed, but that's not critical for status
+		} catch (error) {
+			logError(`[LemonadeStatusMonitor] Version check exception: ${error}`);
 		}
 
 		// Get port configuration

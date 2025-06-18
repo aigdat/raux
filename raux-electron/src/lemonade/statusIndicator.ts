@@ -331,7 +331,6 @@ export class LemonadeStatusIndicator {
 	 * Get display properties for status
 	 */
 	private getStatusDisplay(status: LemonadeStatus): { iconClass: string; tooltip: string } {
-		const version = status.version ? `v${status.version}` : 'Unknown version';
 		
 		const isRunning = status.status === 'running' && status.isHealthy;
 		const statusText = isRunning ? 'Running' : 'Stopped';
@@ -339,7 +338,7 @@ export class LemonadeStatusIndicator {
 
 		return {
 			iconClass,
-			tooltip: `${version} Lemonade is ${statusText}`
+			tooltip: status.version ? `v${status.version} Lemonade is ${statusText}` : `Lemonade is ${statusText}`
 		};
 	}
 
