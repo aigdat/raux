@@ -130,12 +130,14 @@ export class LemonadeStatusIndicator {
 
 		const css = `
       #lemonade-status-indicator {
-        display: inline-flex;
         align-items: center;
+		border-radius: var(--radius-xl);
         color: white;
-        padding: 4px 8px;
+        display: inline-flex;
         font-size: 11px;
         font-family: system-ui, sans-serif;
+		margin-right: 5px;
+		padding: 8px;
         user-select: none;
         z-index: 1000;
       }
