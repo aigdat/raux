@@ -329,45 +329,16 @@ export class LemonadeStatusIndicator {
 	 * Get display properties for status
 	 */
 	private getStatusDisplay(status: LemonadeStatus): { iconClass: string; tooltip: string } {
-		const timestamp = new Date(status.timestamp).toLocaleTimeString();
+		const version = status.version ? `v${status.version}` : 'Unknown version';
+		
+		const isRunning = status.status === 'running' && status.isHealthy;
+		const statusText = isRunning ? 'Running' : 'Stopped';
+		const iconClass = isRunning ? 'running' : 'stopped';
 
-		switch (status.status) {
-			case 'running':
-				return {
-					iconClass: status.isHealthy ? 'running' : 'error',
-					tooltip: `Lemonade Server: ${status.isHealthy ? 'Running normally' : 'Running with issues'}${status.version ? ` (v${status.version})` : ''}${status.port ? ` on port ${status.port}` : ''}\nLast checked: ${timestamp}${status.error ? `\nError: ${status.error}` : ''}`
-				};
-
-			case 'starting':
-				return {
-					iconClass: 'starting',
-					tooltip: `Lemonade Server: Starting up\nLast checked: ${timestamp}`
-				};
-
-			case 'stopped':
-				return {
-					iconClass: 'stopped',
-					tooltip: `Lemonade Server: Stopped\nLast checked: ${timestamp}${status.error ? `\nReason: ${status.error}` : ''}`
-				};
-
-			case 'crashed':
-				return {
-					iconClass: 'error',
-					tooltip: `Lemonade Server: Crashed\nLast checked: ${timestamp}${status.error ? `\nError: ${status.error}` : ''}`
-				};
-
-			case 'unavailable':
-				return {
-					iconClass: 'stopped',
-					tooltip: `Lemonade Server: Not available\nLast checked: ${timestamp}${status.error ? `\nReason: ${status.error}` : ''}`
-				};
-
-			default:
-				return {
-					iconClass: 'stopped',
-					tooltip: `Lemonade Server: Unknown status\nLast checked: ${timestamp}`
-				};
-		}
+		return {
+			iconClass,
+			tooltip: `${version} Lemonade is ${statusText}`
+		};
 	}
 
 	/**
@@ -388,34 +359,11 @@ export class LemonadeStatusIndicator {
               
               if (indicator && icon) {
                 // Determine display properties
-                let iconClass, tooltip;
-                const timestamp = new Date(status.timestamp).toLocaleTimeString();
-                
-                switch (status.status) {
-                  case 'running':
-                    iconClass = status.isHealthy ? 'running' : 'error';
-                    tooltip = \`Lemonade Server: \${status.isHealthy ? 'Running normally' : 'Running with issues'}\${status.version ? \` (v\${status.version})\` : ''}\${status.port ? \` on port \${status.port}\` : ''}\\nLast checked: \${timestamp}\${status.error ? \`\\nError: \${status.error}\` : ''}\`;
-                    break;
-                  case 'starting':
-                    iconClass = 'starting';
-                    tooltip = \`Lemonade Server: Starting up\\nLast checked: \${timestamp}\`;
-                    break;
-                  case 'stopped':
-                    iconClass = 'stopped';
-                    tooltip = \`Lemonade Server: Stopped\\nLast checked: \${timestamp}\${status.error ? \`\\nReason: \${status.error}\` : ''}\`;
-                    break;
-                  case 'crashed':
-                    iconClass = 'error';
-                    tooltip = \`Lemonade Server: Crashed\\nLast checked: \${timestamp}\${status.error ? \`\\nError: \${status.error}\` : ''}\`;
-                    break;
-                  case 'unavailable':
-                    iconClass = 'stopped';
-                    tooltip = \`Lemonade Server: Not available\\nLast checked: \${timestamp}\${status.error ? \`\\nReason: \${status.error}\` : ''}\`;
-                    break;
-                  default:
-                    iconClass = 'stopped';
-                    tooltip = \`Lemonade Server: Unknown status\\nLast checked: \${timestamp}\`;
-                }
+                const version = status.version ? \`v\${status.version}\` : 'Unknown version';
+                const isRunning = status.status === 'running' && status.isHealthy;
+                const statusText = isRunning ? 'Running' : 'Stopped';
+                const iconClass = isRunning ? 'running' : 'stopped';
+                const tooltip = \`\${version} Lemonade is \${statusText}\`;
                 
                 // Update the indicator
                 icon.className = 'lemonade-icon ' + iconClass;
