@@ -62,14 +62,20 @@ export class WindowManager {
     });
 
     this.mainWindow.webContents.on('did-finish-load', () => {
-      logInfo('[WindowManager] Page finished loading - injecting status indicator');
-      this.injectLemonadeStatusIndicator();
-      this.injectStatusUpdateListener();
-      this.setupRefreshPrevention();
+      const currentURL = this.mainWindow?.webContents.getURL();
+      logInfo(`[WindowManager] Page finished loading: ${currentURL}`);
       
-      // Update with current status if available
-      if (this.currentLemonadeStatus) {
-        this.updateStatusIndicator(this.currentLemonadeStatus);
+      // Only inject indicator if we're not on the loading page
+      if (currentURL && !currentURL.includes('loading.html')) {
+        logInfo('[WindowManager] Non-loading page loaded - injecting status indicator');
+        this.injectLemonadeStatusIndicator();
+        this.injectStatusUpdateListener();
+        this.setupRefreshPrevention();
+        
+        // Update with current status if available
+        if (this.currentLemonadeStatus) {
+          this.updateStatusIndicator(this.currentLemonadeStatus);
+        }
       }
     });
 
