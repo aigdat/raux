@@ -258,19 +258,11 @@ export class WindowManager {
       #lemonade-status-indicator {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        background: rgba(0, 0, 0, 0.8);
         color: white;
         padding: 4px 8px;
-        border-radius: 6px;
         font-size: 11px;
         font-family: system-ui, sans-serif;
         user-select: none;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        backdrop-filter: blur(8px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        transition: all 0.2s ease;
-        margin-right: 8px;
         z-index: 1000;
       }
       
@@ -309,16 +301,11 @@ export class WindowManager {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.6; }
       }
-
-      #lemonade-status-text {
-        display: none;
-      }
     `;
 
     const html = `
       <div id="lemonade-status-indicator" title="Lemonade Server Status">
         <div class="lemonade-icon stopped" id="lemonade-icon">${lemonSvgTemplate.replace('LEMON_COLOR', '#FFCC4D')}</div>
-        <span id="lemonade-status-text" style="display: none;">Checking...</span>
       </div>
     `;
 
