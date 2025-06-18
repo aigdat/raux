@@ -13,7 +13,6 @@ export class WindowManager {
   private static instance: WindowManager;
   private mainWindow: BrowserWindow | null = null;
   private ipcManager = IPCManager.getInstance();
-  private baseTitle = 'RAUX';
   private currentLemonadeStatus: LemonadeStatus | null = null;
 
   private constructor() {}
@@ -38,6 +37,7 @@ export class WindowManager {
     });
 
     this.mainWindow.setMenuBarVisibility(false);
+    this.mainWindow.setTitle('AMD GAIA (OpenWebUI)');
     
     this.mainWindow.loadFile(LOADING_PAGE);
     
@@ -172,49 +172,15 @@ export class WindowManager {
   }
 
   /**
-   * Update Lemonade status in the window title and visual indicator
+   * Update Lemonade status visual indicator only (no title bar updates)
    */
   public updateLemonadeStatus(status: LemonadeStatus): void {
     this.currentLemonadeStatus = status;
     
     if (!this.mainWindow) return;
 
-    // Update window title
-    this.updateWindowTitle(status);
-    
     // Update visual indicator if it's injected
     this.updateStatusIndicator(status);
-  }
-
-  /**
-   * Update the window title with Lemonade status
-   */
-  private updateWindowTitle(status: LemonadeStatus): void {
-    if (!this.mainWindow) return;
-
-    let statusText: string;
-    switch (status.status) {
-      case 'running':
-        statusText = status.isHealthy ? 'Running' : 'Running (Issues)';
-        break;
-      case 'starting':
-        statusText = 'Starting';
-        break;
-      case 'stopped':
-        statusText = 'Stopped';
-        break;
-      case 'crashed':
-        statusText = 'Crashed';
-        break;
-      case 'unavailable':
-        statusText = 'Unavailable';
-        break;
-      default:
-        statusText = 'Unknown';
-    }
-
-    const title = `${this.baseTitle} - Lemonade: ${statusText}`;
-    this.mainWindow.setTitle(title);
   }
 
   /**
@@ -229,8 +195,11 @@ export class WindowManager {
     const css = `
       #lemonade-status-indicator {
         position: fixed;
-        bottom: 2px;
-        right: 25px;
+        /* Responsive positioning to prevent element coverage */
+        bottom: calc(2px + (70px - 2px) * (100vw - 1280px) / (1530px - 1280px));
+        bottom: clamp(2px, calc(2px + (70px - 2px) * (100vw - 1280px) / (1530px - 1280px)), 70px);
+        right: calc(25px + (75px - 25px) * (100vw - 1415px) / (1530px - 1415px));
+        right: clamp(15px, calc(25px + (75px - 25px) * (100vw - 1415px) / (1530px - 1415px)), 75px);
         z-index: 10000;
         background: rgba(0, 0, 0, 0.9);
         color: white;
@@ -247,6 +216,28 @@ export class WindowManager {
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.1);
         transition: opacity 0.3s ease, transform 0.2s ease;
+      }
+      
+      /* Responsive positioning based on viewport width */
+      @media (max-width: 1414px) {
+        #lemonade-status-indicator {
+          right: 15px;
+          bottom: 2px;
+        }
+      }
+      
+      @media (min-width: 1415px) and (max-width: 1529px) {
+        #lemonade-status-indicator {
+          right: calc(15px + (75px - 15px) * (100vw - 1415px) / (1530px - 1415px));
+          bottom: calc(2px + (70px - 2px) * (100vw - 1415px) / (1530px - 1415px));
+        }
+      }
+      
+      @media (min-width: 1530px) {
+        #lemonade-status-indicator {
+          right: 75px;
+          bottom: 70px;
+        }
       }
       
       #lemonade-status-indicator:hover {
