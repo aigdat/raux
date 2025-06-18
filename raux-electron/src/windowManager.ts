@@ -133,14 +133,33 @@ export class WindowManager {
     if (!this.mainWindow) return;
 
     this.mainWindow.webContents.executeJavaScript(`
-      document.getElementById('lemonade-status-indicator') ? true : false
-    `).then((indicatorExists: boolean) => {
-      if (!indicatorExists) {
-        logInfo('[WindowManager] Status indicator missing - reinjecting');
-        this.injectLemonadeStatusIndicator();
-        this.injectStatusUpdateListener();
-        if (this.currentLemonadeStatus) {
-          this.updateStatusIndicator(this.currentLemonadeStatus);
+      (function() {
+        const indicator = document.getElementById('lemonade-status-indicator');
+        const chatContextButton = document.getElementById('chat-context-menu-button');
+        return {
+          indicatorExists: !!indicator,
+          buttonExists: !!chatContextButton,
+          indicatorInCorrectLocation: indicator && chatContextButton && chatContextButton.parentElement && chatContextButton.parentElement.contains(indicator)
+        };
+      })();
+    `).then((result: any) => {
+      if (!result.indicatorExists || !result.indicatorInCorrectLocation) {
+        if (result.buttonExists) {
+          logInfo('[WindowManager] Status indicator missing or in wrong location - reinjecting');
+          // Remove existing indicator if it exists but is in wrong location
+          if (result.indicatorExists && !result.indicatorInCorrectLocation) {
+            this.mainWindow?.webContents.executeJavaScript(`
+              const oldIndicator = document.getElementById('lemonade-status-indicator');
+              if (oldIndicator) oldIndicator.remove();
+            `);
+          }
+          this.injectLemonadeStatusIndicator();
+          this.injectStatusUpdateListener();
+          if (this.currentLemonadeStatus) {
+            this.updateStatusIndicator(this.currentLemonadeStatus);
+          }
+        } else {
+          logInfo('[WindowManager] Chat context button not found yet - will retry later');
         }
       }
     }).catch((error) => {
@@ -200,53 +219,28 @@ export class WindowManager {
 
     const css = `
       #lemonade-status-indicator {
-        position: fixed;
-        /* Default positioning */
-        right: 100px;
-        bottom: 25px;
-        z-index: 10000;
-        background: rgba(0, 0, 0, 0.9);
-        color: white;
-        padding: 8px 12px;
-        border-radius: 8px;
-        font-size: 12px;
-        font-family: system-ui, sans-serif;
-        pointer-events: none;
-        user-select: none;
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: 8px;
-        box-shadow: none;
-        backdrop-filter: blur(10px);
+        gap: 6px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-family: system-ui, sans-serif;
+        user-select: none;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(8px);
         border: 1px solid rgba(255, 255, 255, 0.1);
-        transition: opacity 0.3s ease, transform 0.2s ease;
-      }
-      
-      /* Responsive positioning based on viewport width */
-      @media (max-width: 1420px) {
-        #lemonade-status-indicator {
-          right: 100px;
-          bottom: 25px;
-        }
-      }
-      
-      @media (min-width: 1421px) and (max-width: 1505px) {
-        #lemonade-status-indicator {
-          right: 140px;
-          bottom: 25px;
-        }
-      }
-      
-      @media (min-width: 1506px) {
-        #lemonade-status-indicator {
-          right: 5px;
-          bottom: 25px;
-        }
+        transition: all 0.2s ease;
+        margin-right: 8px;
+        z-index: 1000;
       }
       
       #lemonade-status-indicator:hover {
-        background: rgba(0, 0, 0, 0.95);
+        background: rgba(0, 0, 0, 0.9);
         transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
       }
 
       .lemonade-icon {
@@ -294,7 +288,7 @@ export class WindowManager {
     // Inject CSS
     this.mainWindow.webContents.insertCSS(css);
     
-    // Inject HTML with retry mechanism
+    // Inject HTML with retry mechanism targeting the chat context menu button's parent
     this.injectIndicatorWithRetry(html, 0);
   }
 
@@ -302,9 +296,9 @@ export class WindowManager {
    * Inject indicator with retry mechanism to handle timing issues
    */
   private injectIndicatorWithRetry(html: string, attempt: number): void {
-    if (!this.mainWindow || attempt >= 5) {
-      if (attempt >= 5) {
-        logError('[WindowManager] Failed to inject Lemonade status indicator after 5 attempts');
+    if (!this.mainWindow || attempt >= 10) {
+      if (attempt >= 10) {
+        logError('[WindowManager] Failed to inject Lemonade status indicator after 10 attempts');
       }
       return;
     }
@@ -321,13 +315,27 @@ export class WindowManager {
           return { success: false, reason: 'body_not_ready' };
         }
         
-        // Inject the indicator
+        // Find the chat context menu button
+        const chatContextButton = document.getElementById('chat-context-menu-button');
+        if (!chatContextButton) {
+          return { success: false, reason: 'chat_context_button_not_found' };
+        }
+        
+        // Get the parent div of the button
+        const parentDiv = chatContextButton.parentElement;
+        if (!parentDiv) {
+          return { success: false, reason: 'parent_div_not_found' };
+        }
+        
+        // Inject the indicator as the first child of the parent div
         try {
-          document.body.insertAdjacentHTML('beforeend', \`${html}\`);
+          parentDiv.insertAdjacentHTML('afterbegin', \`${html}\`);
           const indicator = document.getElementById('lemonade-status-indicator');
           return { 
             success: !!indicator, 
-            reason: indicator ? 'injected' : 'injection_failed' 
+            reason: indicator ? 'injected_in_parent' : 'injection_failed',
+            parentTag: parentDiv.tagName,
+            parentClass: parentDiv.className
           };
         } catch (error) {
           return { success: false, reason: 'injection_error', error: error.message };
@@ -335,13 +343,14 @@ export class WindowManager {
       })();
     `).then((result: any) => {
       if (result.success) {
-        logInfo(`[WindowManager] Lemonade status indicator ${result.reason === 'already_exists' ? 'already exists' : 'injected successfully'}`);
+        logInfo(`[WindowManager] Lemonade status indicator ${result.reason === 'already_exists' ? 'already exists' : 'injected successfully into ' + (result.parentTag || 'unknown') + ' element'}`);
       } else {
         logInfo(`[WindowManager] Injection attempt ${attempt + 1} failed: ${result.reason}`);
-        // Retry after a delay
+        // Retry after a delay, with longer delays for later attempts
+        const delay = Math.min(500 + (attempt * 200), 2000);
         setTimeout(() => {
           this.injectIndicatorWithRetry(html, attempt + 1);
-        }, 500);
+        }, delay);
       }
     }).catch((error) => {
       logError(`[WindowManager] Error during injection attempt ${attempt + 1}: ${error}`);
