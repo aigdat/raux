@@ -67,28 +67,18 @@ export class WindowManager {
       
       // Only inject indicator if we're not on the loading page
       if (currentURL && !currentURL.includes('loading.html')) {
-        logInfo('[WindowManager] Non-loading page loaded - injecting status indicator');
-        this.injectLemonadeStatusIndicator();
-        this.injectStatusUpdateListener();
+        logInfo('[WindowManager] Non-loading page loaded - ensuring status indicator presence');
         this.setupRefreshPrevention();
-        
-        // Update with current status if available
-        if (this.currentLemonadeStatus) {
-          this.updateStatusIndicator(this.currentLemonadeStatus);
-        }
+        this.ensureIndicatorPresent();
       }
     });
 
     // Handle navigation within the app
     this.mainWindow.webContents.on('did-navigate', (event, url) => {
       logInfo(`[WindowManager] Page navigated to: ${url}`);
-      // Reinject indicator after navigation
+      // Check and reinject indicator after navigation
       setTimeout(() => {
-        this.injectLemonadeStatusIndicator();
-        this.injectStatusUpdateListener();
-        if (this.currentLemonadeStatus) {
-          this.updateStatusIndicator(this.currentLemonadeStatus);
-        }
+        this.ensureIndicatorPresent();
       }, 100);
     });
 
@@ -97,7 +87,7 @@ export class WindowManager {
       logInfo(`[WindowManager] In-page navigation to: ${url}`);
       // Check if indicator still exists, if not reinject
       setTimeout(() => {
-        this.checkAndReinjectIndicator();
+        this.ensureIndicatorPresent();
       }, 100);
     });
   }
@@ -127,25 +117,28 @@ export class WindowManager {
   }
 
   /**
-   * Check if indicator exists and reinject if needed
+   * Ensure indicator is present and in the correct location
    */
-  private checkAndReinjectIndicator(): void {
+  private ensureIndicatorPresent(): void {
     if (!this.mainWindow) return;
 
     this.mainWindow.webContents.executeJavaScript(`
       (function() {
         const indicator = document.getElementById('lemonade-status-indicator');
-        const chatContextButton = document.getElementById('chat-context-menu-button');
+        const navElement = document.querySelector('nav');
+        const controlsElement = navElement ? navElement.querySelector('[aria-label="Controls"]') : null;
+        
         return {
           indicatorExists: !!indicator,
-          buttonExists: !!chatContextButton,
-          indicatorInCorrectLocation: indicator && chatContextButton && chatContextButton.parentElement && chatContextButton.parentElement.contains(indicator)
+          navExists: !!navElement,
+          controlsExists: !!controlsElement,
+          indicatorInCorrectLocation: indicator && controlsElement && controlsElement.parentElement && controlsElement.parentElement.contains(indicator) && controlsElement.previousElementSibling === indicator
         };
       })();
     `).then((result: any) => {
       if (!result.indicatorExists || !result.indicatorInCorrectLocation) {
-        if (result.buttonExists) {
-          logInfo('[WindowManager] Status indicator missing or in wrong location - reinjecting');
+        if (result.navExists && result.controlsExists) {
+          logInfo('[WindowManager] Status indicator missing or in wrong location - ensuring presence');
           // Remove existing indicator if it exists but is in wrong location
           if (result.indicatorExists && !result.indicatorInCorrectLocation) {
             this.mainWindow?.webContents.executeJavaScript(`
@@ -159,11 +152,11 @@ export class WindowManager {
             this.updateStatusIndicator(this.currentLemonadeStatus);
           }
         } else {
-          logInfo('[WindowManager] Chat context button not found yet - will retry later');
+          logInfo('[WindowManager] Nav or controls element not found yet - will retry later');
         }
       }
     }).catch((error) => {
-      logError(`[WindowManager] Error checking indicator existence: ${error}`);
+      logError(`[WindowManager] Error ensuring indicator presence: ${error}`);
     });
   }
 
@@ -315,27 +308,29 @@ export class WindowManager {
           return { success: false, reason: 'body_not_ready' };
         }
         
-        // Find the chat context menu button
-        const chatContextButton = document.getElementById('chat-context-menu-button');
-        if (!chatContextButton) {
-          return { success: false, reason: 'chat_context_button_not_found' };
+        // Find the nav element
+        const navElement = document.querySelector('nav');
+        if (!navElement) {
+          return { success: false, reason: 'nav_element_not_found' };
         }
         
-        // Get the parent div of the button
-        const parentDiv = chatContextButton.parentElement;
-        if (!parentDiv) {
-          return { success: false, reason: 'parent_div_not_found' };
+        // Find child element with aria-label="Controls" within the nav
+        const controlsElement = navElement.querySelector('[aria-label="Controls"]');
+        if (!controlsElement) {
+          return { success: false, reason: 'controls_element_not_found' };
         }
         
-        // Inject the indicator as the first child of the parent div
+        // Inject the indicator before the controls element
         try {
-          parentDiv.insertAdjacentHTML('afterbegin', \`${html}\`);
+          controlsElement.insertAdjacentHTML('beforebegin', \`${html}\`);
           const indicator = document.getElementById('lemonade-status-indicator');
           return { 
             success: !!indicator, 
-            reason: indicator ? 'injected_in_parent' : 'injection_failed',
-            parentTag: parentDiv.tagName,
-            parentClass: parentDiv.className
+            reason: indicator ? 'injected_before_controls' : 'injection_failed',
+            navTag: navElement.tagName,
+            navClass: navElement.className,
+            controlsTag: controlsElement.tagName,
+            controlsClass: controlsElement.className
           };
         } catch (error) {
           return { success: false, reason: 'injection_error', error: error.message };
@@ -343,7 +338,7 @@ export class WindowManager {
       })();
     `).then((result: any) => {
       if (result.success) {
-        logInfo(`[WindowManager] Lemonade status indicator ${result.reason === 'already_exists' ? 'already exists' : 'injected successfully into ' + (result.parentTag || 'unknown') + ' element'}`);
+        logInfo(`[WindowManager] Lemonade status indicator ${result.reason === 'already_exists' ? 'already exists' : 'injected successfully before controls element in ' + (result.navTag || 'unknown') + ' nav'}`);
       } else {
         logInfo(`[WindowManager] Injection attempt ${attempt + 1} failed: ${result.reason}`);
         // Retry after a delay, with longer delays for later attempts
@@ -395,10 +390,10 @@ export class WindowManager {
     `).then((result: any) => {
       if (!result.success) {
         logInfo(`[WindowManager] Status indicator update failed - missing elements: ${JSON.stringify(result.missing)}`);
-        // Try to re-inject the indicator if it's missing
+        // Try to ensure the indicator is present if it's missing
         if (result.missing.indicator) {
-          logInfo('[WindowManager] Re-injecting status indicator...');
-          this.injectLemonadeStatusIndicator();
+          logInfo('[WindowManager] Ensuring indicator presence after update failure...');
+          this.ensureIndicatorPresent();
         }
       }
     }).catch((error) => {
