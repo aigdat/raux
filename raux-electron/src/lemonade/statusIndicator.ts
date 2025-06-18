@@ -141,9 +141,10 @@ export class LemonadeStatusIndicator {
       }
       
       #lemonade-status-indicator:hover {
-        background: rgba(0, 0, 0, 0.9);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        background: var(--color-gray-850, #262626);
+        transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, -webkit-text-decoration-color;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 150ms;
       }
 
       .lemonade-icon {
