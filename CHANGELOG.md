@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5+raux.0.2.1] - 2025-06-18
+
+### Added
+
+- **🍋 Enhanced Lemonade Server Architecture**: Complete refactoring of Lemonade integration with new modular architecture including dedicated client, detector, process manager, status monitor, and status indicator components
+- **📊 Visual Lemonade Status Indicator**: Real-time visual status indicator in the UI showing Lemonade server status with dynamic icons and tooltips
+- **🔍 Advanced Lemonade Detection**: Improved Lemonade server detection with robust health checking, version validation, and compatibility checking
+- **⚙️ Intelligent Process Management**: Enhanced process lifecycle management with automatic restart capabilities, health monitoring, and graceful error handling
+- **📡 Real-time Status Monitoring**: Comprehensive status monitoring system with event-driven updates and configurable health check intervals
+- **🔧 Modular Lemonade Client**: Redesigned client architecture with separation of concerns for better maintainability and testing
+- **🎯 Smart Health Checking**: Dedicated health check system with timeout handling and configurable intervals for different server states
+- **🏗️ Improved Startup Detection**: Enhanced server startup detection with proper timeout handling and status validation
+
+### Fixed
+
+- **🔄 Status Update Reliability**: Resolved issues with status indicator updates and improved DOM element detection
+- **⚡ Process Lifecycle Management**: Fixed process startup and shutdown handling for better reliability
+- **🛠️ Error Handling**: Enhanced error handling throughout the Lemonade integration stack
+
+### Changed
+
+- **📁 Code Organization**: Restructured Lemonade-related code into dedicated modules under `/lemonade/` directory
+- **🔧 Architecture Refactoring**: Moved from monolithic approach to modular, event-driven architecture for better maintainability
+- **📋 Status Reporting**: Enhanced status reporting with more detailed information and better error messaging
+
 ## [0.6.5+raux.0.2.0] - 2025-05-20
 
 ### Added

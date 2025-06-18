@@ -203,6 +203,8 @@
       });
     });
 
+    // Remove the lemonade status handling - this will be handled by the main app indicator
+
     // Optionally, scroll to bottom on new message
     const statusObserver = new MutationObserver(() => {
       statusDiv.scrollTop = statusDiv.scrollHeight;
