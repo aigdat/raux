@@ -195,11 +195,9 @@ export class WindowManager {
     const css = `
       #lemonade-status-indicator {
         position: fixed;
-        /* Responsive positioning to prevent element coverage */
-        bottom: calc(2px + (70px - 2px) * (100vw - 1280px) / (1530px - 1280px));
-        bottom: clamp(2px, calc(2px + (70px - 2px) * (100vw - 1280px) / (1530px - 1280px)), 70px);
-        right: calc(25px + (75px - 25px) * (100vw - 1415px) / (1530px - 1415px));
-        right: clamp(15px, calc(25px + (75px - 25px) * (100vw - 1415px) / (1530px - 1415px)), 75px);
+        /* Default positioning */
+        right: 100px;
+        bottom: 25px;
         z-index: 10000;
         background: rgba(0, 0, 0, 0.9);
         color: white;
@@ -219,24 +217,24 @@ export class WindowManager {
       }
       
       /* Responsive positioning based on viewport width */
-      @media (max-width: 1414px) {
+      @media (max-width: 1420px) {
         #lemonade-status-indicator {
-          right: 15px;
-          bottom: 2px;
+          right: 100px;
+          bottom: 25px;
         }
       }
       
-      @media (min-width: 1415px) and (max-width: 1529px) {
+      @media (min-width: 1421px) and (max-width: 1505px) {
         #lemonade-status-indicator {
-          right: calc(15px + (75px - 15px) * (100vw - 1415px) / (1530px - 1415px));
-          bottom: calc(2px + (70px - 2px) * (100vw - 1415px) / (1530px - 1415px));
+          right: 140px;
+          bottom: 25px;
         }
       }
       
-      @media (min-width: 1530px) {
+      @media (min-width: 1506px) {
         #lemonade-status-indicator {
-          right: 75px;
-          bottom: 70px;
+          right: 5px;
+          bottom: 25px;
         }
       }
       
