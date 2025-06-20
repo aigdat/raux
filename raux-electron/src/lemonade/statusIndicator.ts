@@ -338,7 +338,7 @@ export class LemonadeStatusIndicator {
 
 		return {
 			iconClass,
-			tooltip: status.version ? `v${status.version} Lemonade is ${statusText}` : `Lemonade is ${statusText}`
+			tooltip: status.version ? `Lemonade v${status.version} is ${statusText}` : `Lemonade is ${statusText}`
 		};
 	}
 
