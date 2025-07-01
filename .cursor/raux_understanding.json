@@ -1,7 +1,7 @@
 {
   "project_understanding": {
     "raux": {
-      "description": "RAUX (AMD GAIA UI [beta]) is AMD's UI for interacting with AI models, based on a fork of Open WebUI",
+      "description": "RAUX (AMD GAIA UI) is AMD's UI for interacting with AI models, based on a fork of Open WebUI",
       "origin": {
         "forked_from": "Open WebUI (https://github.com/open-webui/open-webui)",
         "original_project": "User-friendly AI interface supporting Ollama, OpenAI API, and other LLM backends",

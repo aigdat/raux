@@ -95,7 +95,7 @@ class RauxSetup {
 			logInfo('RAUX installation already exists and is functional, skipping installation.');
 			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 				type: 'success',
-				message: 'GAIA Beta components already installed.',
+				message: 'GAIA UI components already installed.',
 				step: 'raux-check'
 			});
 			return;
@@ -105,19 +105,19 @@ class RauxSetup {
 		try {
 			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 				type: 'info',
-				message: 'Downloading GAIA Beta components...',
+				message: 'Downloading GAIA UI components...',
 				step: 'raux-download'
 			});
 			tmpDir = await this.downloadRAUXWheel();
 			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 				type: 'info',
-				message: 'Installing GAIA Beta...',
+				message: 'Installing GAIA UI...',
 				step: 'raux-install'
 			});
 			await this.installRAUXWheel(tmpDir);
 			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 				type: 'info',
-				message: 'Configuring GAIA Beta environment...',
+				message: 'Configuring GAIA UI environment...',
 				step: 'raux-env'
 			});
 			await this.copyEnvToPythonLib(tmpDir);
@@ -132,14 +132,14 @@ class RauxSetup {
 			logInfo('RAUX wheel and env setup completed successfully.');
 			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_COMPLETE, {
 				type: 'success',
-				message: 'GAIA Beta installation completed.',
+				message: 'GAIA UI installation completed.',
 				step: 'raux-complete'
 			});
 		} catch (err) {
 			logError(`RAUX wheel installation failed: ${err}`);
 			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
 				type: 'error',
-				message: 'GAIA Beta installation failed!',
+				message: 'GAIA UI installation failed!',
 				step: 'raux-error'
 			});
 			throw err;
@@ -188,7 +188,7 @@ class RauxSetup {
 								logInfo('Build context zip download finished.');
 								this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 									type: 'success',
-									message: 'GAIA Beta components downloaded.',
+									message: 'GAIA UI components downloaded.',
 									step: 'raux-download'
 								});
 								resolve();
@@ -225,7 +225,7 @@ class RauxSetup {
 			logInfo('Build context extraction finished.');
 			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 				type: 'success',
-				message: 'GAIA Beta components extracted.',
+				message: 'GAIA UI components extracted.',
 				step: 'raux-extract'
 			});
 		} catch (error) {
@@ -244,7 +244,7 @@ class RauxSetup {
 		logInfo(`Installing RAUX wheel(s) from directory: ${extractDir}...`);
 		this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 			type: 'info',
-			message: 'Preparing GAIA Beta installation...',
+			message: 'Preparing GAIA UI installation...',
 			step: 'raux-env'
 		});
 
@@ -293,7 +293,7 @@ class RauxSetup {
 				logInfo(`${whlFile} installed successfully.`);
 				this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 					type: 'success',
-					message: 'GAIA Beta components installed successfully.',
+					message: 'GAIA UI components installed successfully.',
 					step: 'raux-install'
 				});
 			} else {
@@ -355,7 +355,7 @@ class RauxSetup {
 
 			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 				type: 'success',
-				message: 'GAIA Beta configuration completed.',
+				message: 'GAIA UI configuration completed.',
 				step: 'raux-env'
 			});
 		} catch (err) {
