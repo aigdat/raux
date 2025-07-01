@@ -1,6 +1,6 @@
 {
-  "name": "gaia-beta",
-  "productName": "GAIA BETA",
+  "name": "gaia-ui",
+  "productName": "GAIA UI",
   "version": "0.2.2",
   "raux-version": "0.6.5+raux.0.2.2",
   "description": "GAIA's Ryzen AI User Experience (RAUX)",

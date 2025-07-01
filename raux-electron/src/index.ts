@@ -72,7 +72,7 @@ const startServices = async (): Promise<void> => {
 		// Start RAUX backend
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 			type: 'info',
-			message: 'Starting GAIA Beta services...'
+			message: 'Starting GAIA UI services...'
 		});
 		await rauxProcessManager.startRaux();
 	} catch (err) {
@@ -81,7 +81,7 @@ const startServices = async (): Promise<void> => {
 	}
 };
 
-app.setAppUserModelId('com.squirrel.GaiaBeta.GaiaBeta');
+app.setAppUserModelId('com.squirrel.GaiaUi.GaiaUi');
 
 logInfo(`Main process started\nArgs: ${process.argv.join(' ')}\n`);
 
@@ -178,16 +178,16 @@ const runStartupFlow = async (): Promise<void> => {
 
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 			type: 'info',
-			message: 'Connecting to GAIA Beta...'
+			message: 'Connecting to GAIA UI...'
 		});
 		pollBackend();
 	} catch (err) {
 		logError('Startup failed: ' + (err && err.toString ? err.toString() : String(err)));
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
 			type: 'error',
-			message: 'Failed to start GAIA Beta. Check logs.'
+			message: 'Failed to start GAIA UI. Check logs.'
 		});
-		windowManager.showErrorPage('Failed to start GAIA Beta');
+		windowManager.showErrorPage('Failed to start GAIA UI');
 	}
 };
 
@@ -197,7 +197,7 @@ const runInstallationFlow = async (): Promise<void> => {
 		// Installation-specific messaging
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 			type: 'info',
-			message: 'Beginning GAIA Beta installation...'
+			message: 'Beginning GAIA UI installation...'
 		});
 
 		// Install Python environment with installation messages
@@ -212,7 +212,7 @@ const runInstallationFlow = async (): Promise<void> => {
 		});
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 			type: 'info',
-			message: 'Starting GAIA Beta for the first time...'
+			message: 'Starting GAIA UI for the first time...'
 		});
 
 		await startServices();
@@ -222,7 +222,7 @@ const runInstallationFlow = async (): Promise<void> => {
 
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 			type: 'info',
-			message: 'Initializing GAIA Beta...'
+			message: 'Initializing GAIA UI...'
 		});
 		pollBackend();
 	} catch (err) {

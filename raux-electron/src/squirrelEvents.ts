@@ -16,7 +16,7 @@ function cleanupRauxInstallation(): void {
   
   try {
     // Remove RAUX runtime directory (now safe as it's in a subdirectory)
-    const installDir = getAppInstallDir(); // This is now GaiaBeta/runtime
+    const installDir = getAppInstallDir(); // This is now GaiaUi/runtime
     logInfo(`Removing RAUX runtime dir: ${installDir}`);
     rmSync(installDir, { recursive: true, force: true });
     
@@ -25,7 +25,7 @@ function cleanupRauxInstallation(): void {
     logInfo(`Removing user data dir: ${userDir}`);
     rmSync(userDir, { recursive: true, force: true });
     
-    // Note: Desktop shortcut and the parent GaiaBeta directory will be 
+    // Note: Desktop shortcut and the parent GaiaUi directory will be 
     // cleaned up by Squirrel's uninstaller automatically
     app.quit();
   } catch (e) {

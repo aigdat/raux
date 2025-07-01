@@ -25,7 +25,7 @@ const config: ForgeConfig = {
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
-      name: 'GaiaBeta',
+      name: 'GaiaUi',
       exe: 'raux.exe',
       setupExe: 'raux-setup.exe',
       setupIcon: 'static/favicon.ico'
