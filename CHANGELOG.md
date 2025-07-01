@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.6.5+raux.0.2.2] - 2025-07-01
 
 ### Changes
-- **🟢 Branding Update** Updated branding to use new GAIA icon
+- **🟢 Branding Update** Updated branding to match GAIA
+- **⬆️ Simplify Install** Remove generic vs hybrid flow
 
 ## [0.6.5+raux.0.2.1] - 2025-06-18
 
