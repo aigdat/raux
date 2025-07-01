@@ -15,16 +15,14 @@ RAUX is designed to be installed as part of the GAIA ecosystem, though it mainta
 ### Installation Flow
 1. **GAIA Installer** downloads `raux-wheel-context.zip` from GitHub releases
 2. **RAUX Setup** (via `rauxSetup.ts`) extracts and installs the Python wheel
-3. **Environment Detection** determines if Lemonade is available and configures accordingly:
-   - **Hybrid Mode** (`raux-hybrid.env`): Integrates with Lemonade server at `http://localhost:8000/api/v0`
-   - **Generic Mode** (`raux-generic.env`): Standalone mode with Ollama integration
+3. **Environment Configuration** uses a single configuration file:
+   - **Configuration** (`raux.env`): Integrates with Lemonade server at `http://localhost:8000/api/v0`
 
 ### Key Components
 - **Python Wheel**: Built from `/backend` directory via `pyproject.toml`
 - **Electron Wrapper**: Provides desktop application experience
-- **Environment Files**: 
-  - `raux-hybrid.env`: Lemonade integration configuration
-  - `raux-generic.env`: Standalone mode configuration
+- **Environment File**: 
+  - `raux.env`: Lemonade integration configuration
 - **Build Context**: Packaged as `raux-wheel-context.zip` containing wheel + env files
 
 ### Release Artifacts
@@ -47,30 +45,19 @@ RAUX is designed to be installed as part of the GAIA ecosystem, though it mainta
 **Key Installation Files:**
 - `raux-electron/src/rauxSetup.ts`: Main installation orchestration
 - `raux-electron/src/pythonExec.ts`: Python environment management
-- Environment detection logic automatically selects hybrid vs generic mode
-
-### Environment Mode Selection
-**Hybrid Mode Triggers:**
-- Lemonade server detected in PATH or USERPROFILE
-- `GAIA_MODE=HYBRID` environment variable
-- Results in Lemonade integration at `http://localhost:8000/api/v0`
-
-**Generic Mode:**
-- Default fallback when Lemonade not detected
-- Uses Ollama backend at `http://localhost:11434`
+- Always uses Lemonade integration configuration
 
 ### Build Process for GAIA Integration
 **GitHub Actions Workflow** (`.github/workflows/build-and-package.yml`):
 1. **build-wheel**: Creates Python wheel from backend + frontend
-2. **build-context**: Packages wheel with `raux-hybrid.env` and `raux-generic.env`
+2. **build-context**: Packages wheel with `raux.env`
 3. **package-electron**: Creates Windows installer with embedded context
 
 **Wheel Context Structure:**
 ```
 raux-wheel-context.zip
 ├── open_webui-*.whl     # Python wheel with backend + built frontend
-├── raux-hybrid.env      # Lemonade integration config
-└── raux-generic.env     # Standalone mode config
+└── raux.env             # Lemonade integration config
 ```
 
 ## Development Commands

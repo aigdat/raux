@@ -24,49 +24,30 @@ declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 const RAUX_URL = 'http://localhost:8080';
 
-// Check if we're in hybrid mode (with Lemonade integration)
-const isHybridMode = (): boolean => {
-	// Check if GAIA_MODE environment variable is set to HYBRID
-	const gaiaMode = process.env.GAIA_MODE;
-	if (gaiaMode === 'HYBRID') {
-		return true;
-	}
-
-	// If no explicit mode set, check if Lemonade is available
-	// This logic matches the one in rauxSetup.ts
-	return false; // We'll do runtime detection in startServices
-};
 
 // Start both RAUX and Lemonade services if needed
 const startServices = async (): Promise<void> => {
 	try {
-		// Check if we should start Lemonade (hybrid mode)
-		const shouldStartLemonade =
-			isHybridMode() || (await lemonadeProcessManager.isLemonadeAvailable());
+		// Always start Lemonade in hybrid mode
+		logInfo('Starting Lemonade server...');
+		ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
+			type: 'info',
+			message: 'Starting Lemonade Server...'
+		});
 
-		if (shouldStartLemonade) {
-			logInfo('Hybrid mode detected - starting Lemonade server...');
+		const lemonadeStarted = await lemonadeProcessManager.startLemonade();
+		if (lemonadeStarted) {
+			logInfo('Lemonade server started successfully');
 			ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
-				type: 'info',
-				message: 'Starting Lemonade Server...'
+				type: 'success',
+				message: 'Lemonade Server ready.'
 			});
-
-			const lemonadeStarted = await lemonadeProcessManager.startLemonade();
-			if (lemonadeStarted) {
-				logInfo('Lemonade server started successfully');
-				ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
-					type: 'success',
-					message: 'Lemonade Server ready.'
-				});
-			} else {
-				logInfo('Failed to start Lemonade server, continuing with RAUX only');
-				ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
-					type: 'warning',
-					message: 'Lemonade unavailable.'
-				});
-			}
 		} else {
-			logInfo('Generic mode - skipping Lemonade startup');
+			logInfo('Failed to start Lemonade server, continuing with RAUX only');
+			ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
+				type: 'warning',
+				message: 'Lemonade unavailable.'
+			});
 		}
 
 		// Start RAUX backend

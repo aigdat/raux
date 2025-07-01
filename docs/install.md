@@ -57,8 +57,7 @@ The build process for RAUX is managed by GitHub Actions workflows. The key workf
 
 2. **Wheel Context (raux-wheel-context.zip)**:
    - Contains the Python wheel
-   - Includes `raux-hybrid.env` (for Lemonade integration)
-   - Includes `raux-generic.env` (for standalone mode)
+   - Includes `raux.env` (for Lemonade integration)
    - Used by the Electron installer for Python environment setup
 
 3. **Electron Installer (raux-setup.exe)**:
@@ -100,11 +99,8 @@ When users run `raux-setup.exe` directly:
    - Extracts and installs Python environment
    - Installs RAUX wheel package
 
-3. **Environment Detection**:
-   - Checks for Lemonade/GAIA presence
-   - Selects appropriate configuration:
-     - **Hybrid Mode**: If Lemonade detected → uses `raux-hybrid.env`
-     - **Generic Mode**: Otherwise → uses `raux-generic.env`
+3. **Environment Configuration**:
+   - Uses single `raux.env` configuration for Lemonade integration
 
 4. **Auto-Launch**:
    - Application automatically starts after installation
@@ -133,31 +129,16 @@ When RAUX is installed as part of GAIA:
    - Automatic hybrid mode configuration
    - Integrated with GAIA's Lemonade server
 
-## Environment Modes
+## Environment Configuration
 
-RAUX automatically configures itself based on the detected environment:
+RAUX uses a single configuration approach:
 
-### Hybrid Mode (GAIA/Lemonade Integration)
+### Configuration
 
-**Activation Conditions**:
-- `GAIA_MODE=HYBRID` environment variable is set
-- OR Lemonade executable found in PATH or USERPROFILE
-
-**Configuration**:
-- Uses `raux-hybrid.env` configuration file
+**Configuration File**:
+- Uses `raux.env` configuration file
 - Connects to Lemonade API at `http://localhost:8000/api/v0`
 - Integrates with GAIA's AI infrastructure
-
-### Generic Mode (Standalone)
-
-**Activation Conditions**:
-- Default when Lemonade is not detected
-- No GAIA environment variables set
-
-**Configuration**:
-- Uses `raux-generic.env` configuration file
-- Connects to Ollama at `http://localhost:11434`
-- Operates independently of GAIA
 
 ## Technical Implementation Details
 
