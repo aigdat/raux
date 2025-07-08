@@ -233,7 +233,7 @@ const pollBackend = () => {
 			if (rauxProcessManager.getStatus() === 'crashed') {
 				windowManager.showErrorPage('GAIA failed to start');
 			} else {
-				setTimeout(pollBackend, 1000);
+				setTimeout(pollBackend, 2000);
 			}
 		});
 };

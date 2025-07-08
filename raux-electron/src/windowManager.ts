@@ -1,7 +1,7 @@
 import { BrowserWindow, app } from 'electron';
 import { join } from 'path';
 import { IPCManager } from './ipc/ipcManager';
-import { getRendererPath } from './envUtils';
+import { getRendererPath, isInstallationComplete } from './envUtils';
 import { LemonadeStatus } from './ipc/ipcTypes';
 import { logInfo, logError } from './logger';
 import { lemonadeStatusIndicator } from './lemonade/statusIndicator';
@@ -61,41 +61,52 @@ export class WindowManager {
 			logInfo(`[WindowManager] Page navigation started to: ${url}`);
 		});
 
-		this.mainWindow.webContents.on('did-finish-load', () => {
+		this.mainWindow.webContents.on('did-finish-load', async () => {
 			const currentURL = this.mainWindow?.webContents.getURL();
 			logInfo(`[WindowManager] Page finished loading: ${currentURL}`);
 
-			// Only inject indicator if we're not on the loading page
+			// Only inject indicator if we're not on the loading page and installation is complete
 			if (currentURL && !currentURL.includes('loading.html')) {
-				logInfo('[WindowManager] Non-loading page loaded - ensuring status indicator presence');
-				this.setupRefreshPrevention();
+				const installationComplete = await isInstallationComplete();
+				if (installationComplete) {
+					logInfo('[WindowManager] Non-loading page loaded and installation complete - ensuring status indicator presence');
+					this.setupRefreshPrevention();
 
-				// Add a small delay to ensure DOM is fully ready
-				setTimeout(() => {
-					logInfo('[WindowManager] Starting indicator injection after DOM ready delay');
-					lemonadeStatusIndicator.ensureIndicatorPresent(this.mainWindow);
-				}, 500);
+					// Add a small delay to ensure DOM is fully ready
+					setTimeout(() => {
+						logInfo('[WindowManager] Starting indicator injection after DOM ready delay');
+						lemonadeStatusIndicator.ensureIndicatorPresent(this.mainWindow);
+					}, 500);
+				} else {
+					logInfo('[WindowManager] Installation not complete, skipping indicator injection');
+				}
 			} else {
 				logInfo('[WindowManager] Loading page detected, skipping indicator injection');
 			}
 		});
 
 		// Handle navigation within the app
-		this.mainWindow.webContents.on('did-navigate', (event, url) => {
+		this.mainWindow.webContents.on('did-navigate', async (event, url) => {
 			logInfo(`[WindowManager] Page navigated to: ${url}`);
-			// Check and reinject indicator after navigation
-			setTimeout(() => {
-				lemonadeStatusIndicator.ensureIndicatorPresent(this.mainWindow);
-			}, 100);
+			// Check and reinject indicator after navigation only if installation is complete
+			const installationComplete = await isInstallationComplete();
+			if (installationComplete) {
+				setTimeout(() => {
+					lemonadeStatusIndicator.ensureIndicatorPresent(this.mainWindow);
+				}, 2000);
+			}
 		});
 
 		// Handle in-page navigation (like hash changes)
-		this.mainWindow.webContents.on('did-navigate-in-page', (event, url) => {
+		this.mainWindow.webContents.on('did-navigate-in-page', async (event, url) => {
 			logInfo(`[WindowManager] In-page navigation to: ${url}`);
-			// Check if indicator still exists, if not reinject
-			setTimeout(() => {
-				lemonadeStatusIndicator.ensureIndicatorPresent(this.mainWindow);
-			}, 100);
+			// Check if indicator still exists, if not reinject - only if installation is complete
+			const installationComplete = await isInstallationComplete();
+			if (installationComplete) {
+				setTimeout(() => {
+					lemonadeStatusIndicator.ensureIndicatorPresent(this.mainWindow);
+				}, 2000);
+			}
 		});
 	}
 
