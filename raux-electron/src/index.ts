@@ -1,7 +1,8 @@
 import { app } from 'electron';
-import { logInfo, logError } from './logger';
+import { logInfo, logError, logPath } from './logger';
 import {
 	getAppInstallDir,
+	getUserInstallDir,
 	checkAndHandleAutoLaunchPrevention,
 	isInstallationComplete
 } from './envUtils';
@@ -51,13 +52,28 @@ const startServices = async (): Promise<void> => {
 		}
 
 		// Start RAUX backend
+		logInfo('Starting RAUX backend process...');
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 			type: 'info',
 			message: 'Starting GAIA UI services...'
 		});
 		await rauxProcessManager.startRaux();
+		
+		// Log RAUX process status after startup attempt
+		const rauxStatus = rauxProcessManager.getStatus();
+		logInfo(`RAUX backend startup completed with status: ${rauxStatus}`);
+		
+		if (rauxStatus === 'crashed') {
+			throw new Error(`RAUX backend failed to start - status: ${rauxStatus}`);
+		}
 	} catch (err) {
-		logError(`Error starting services: ${err && err.toString ? err.toString() : String(err)}`);
+		const errorMessage = err && err.toString ? err.toString() : String(err);
+		const errorStack = err && err.stack ? err.stack : 'No stack trace available';
+		
+		logError(`Error starting services: ${errorMessage}`);
+		logError(`Service startup error stack: ${errorStack}`);
+		logError(`RAUX process status: ${rauxProcessManager.getStatus()}`);
+		
 		throw err;
 	}
 };
@@ -166,7 +182,7 @@ const runStartupFlow = async (): Promise<void> => {
 		logError('Startup failed: ' + (err && err.toString ? err.toString() : String(err)));
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
 			type: 'error',
-			message: 'Failed to start GAIA UI. Check logs.'
+			message: `Failed to start GAIA UI. Check logs at: ${logPath}`
 		});
 		windowManager.showErrorPage('Failed to start GAIA UI');
 	}
@@ -207,10 +223,18 @@ const runInstallationFlow = async (): Promise<void> => {
 		});
 		pollBackend();
 	} catch (err) {
-		logError('Installation failed: ' + (err && err.toString ? err.toString() : String(err)));
+		const errorMessage = err && err.toString ? err.toString() : String(err);
+		const errorStack = err && err.stack ? err.stack : 'No stack trace available';
+		
+		// Enhanced error logging with context
+		logError(`Installation failed with error: ${errorMessage}`);
+		logError(`Error stack trace: ${errorStack}`);
+		logError(`System info: Platform=${process.platform}, Arch=${process.arch}, Node=${process.version}`);
+		logError(`Environment state: AppInstallDir=${getAppInstallDir()}, UserInstallDir=${getUserInstallDir()}`);
+		
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
 			type: 'error',
-			message: 'Installation failed. Check logs.'
+			message: `Installation failed. Check logs at: ${logPath}`
 		});
 		windowManager.showErrorPage('Installation failed');
 	}
@@ -218,7 +242,8 @@ const runInstallationFlow = async (): Promise<void> => {
 
 const pollBackend = () => {
 	fetch(RAUX_URL)
-		.then(() => {
+		.then((response) => {
+			logInfo(`Backend connected successfully - Status: ${response.status}`);
 			ipcManager.sendToAll(IPCChannels.INSTALLATION_COMPLETE, {
 				type: 'success',
 				message: 'GAIA is ready.'
@@ -229,11 +254,14 @@ const pollBackend = () => {
 			});
 			windowManager.showMainApp();
 		})
-		.catch(() => {
-			if (rauxProcessManager.getStatus() === 'crashed') {
+		.catch((error) => {
+			const rauxStatus = rauxProcessManager.getStatus();
+			
+			if (rauxStatus === 'crashed') {
+				logError(`Backend connection failed - RAUX backend crashed. Error: ${error.message || error}`);
 				windowManager.showErrorPage('GAIA failed to start');
 			} else {
-				setTimeout(pollBackend, 1000);
+				setTimeout(pollBackend, 2000);
 			}
 		});
 };

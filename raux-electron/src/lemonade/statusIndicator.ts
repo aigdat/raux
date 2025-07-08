@@ -33,7 +33,7 @@ export class LemonadeStatusIndicator {
 	public ensureIndicatorPresent(mainWindow: BrowserWindow | null): void {
 		if (!mainWindow) return;
 
-		logInfo('[LemonadeStatusIndicator] ensureIndicatorPresent() called - checking DOM elements');
+		// Removed verbose DOM check logging to reduce log spam
 
 		mainWindow.webContents
 			.executeJavaScript(
@@ -73,13 +73,10 @@ export class LemonadeStatusIndicator {
     `
 			)
 			.then((result: any) => {
-				logInfo(`[LemonadeStatusIndicator] DOM Check Results: ${JSON.stringify(result, null, 2)}`);
-
+				// Reduced logging to minimize spam
+				
 				if (!result.indicatorExists || !result.indicatorInCorrectLocation) {
 					if (result.navExists && result.controlsExists) {
-						logInfo(
-							'[LemonadeStatusIndicator] Status indicator missing or in wrong location - ensuring presence'
-						);
 						// Remove existing indicator if it exists but is in wrong location
 						if (result.indicatorExists && !result.indicatorInCorrectLocation) {
 							mainWindow.webContents.executeJavaScript(`
@@ -93,27 +90,11 @@ export class LemonadeStatusIndicator {
 							this.updateStatusIndicator(this.currentLemonadeStatus, mainWindow);
 						}
 					} else {
-						logError(
-							`[LemonadeStatusIndicator] Required elements not found - Nav: ${result.navExists}, Controls: ${result.controlsExists}`
-						);
-						if (result.debug.navInfo) {
-							logInfo(
-								`[LemonadeStatusIndicator] Nav found but missing controls. Nav has ${result.debug.ariaLabelsInNavCount} aria-labels: ${JSON.stringify(result.debug.navInfo.ariaLabelsInNav)}`
-							);
-						} else {
-							logInfo(`[LemonadeStatusIndicator] No nav element found in DOM`);
-						}
-
 						// Try again after a longer delay
 						setTimeout(() => {
-							logInfo(
-								'[LemonadeStatusIndicator] Retrying ensureIndicatorPresent after 2 seconds...'
-							);
 							this.ensureIndicatorPresent(mainWindow);
 						}, 2000);
 					}
-				} else {
-					logInfo('[LemonadeStatusIndicator] Indicator already exists and is in correct location');
 				}
 			})
 			.catch((error) => {
@@ -250,28 +231,36 @@ export class LemonadeStatusIndicator {
 			)
 			.then((result: any) => {
 				if (result.success) {
-					logInfo(
-						`[LemonadeStatusIndicator] Lemonade status indicator ${result.reason === 'already_exists' ? 'already exists' : 'injected successfully before controls element in ' + (result.navTag || 'unknown') + ' nav'}`
-					);
+					// Only log success once
+					if (attempt === 0 || result.reason !== 'already_exists') {
+						logInfo(
+							`[LemonadeStatusIndicator] Lemonade status indicator ${result.reason === 'already_exists' ? 'already exists' : 'injected successfully'}`
+						);
+					}
 				} else {
-					logInfo(
-						`[LemonadeStatusIndicator] Injection attempt ${attempt + 1} failed: ${result.reason}`
-					);
-					// Retry after a delay, with longer delays for later attempts
-					const delay = Math.min(500 + attempt * 200, 2000);
+					// Only log failure on the last attempt
+					if (attempt >= 9) {
+						logError(
+							`[LemonadeStatusIndicator] Failed to inject indicator after ${attempt + 1} attempts: ${result.reason}`
+						);
+					}
+					// Retry after a delay, standardized to 2 seconds
 					setTimeout(() => {
 						this.injectIndicatorWithRetry(html, attempt + 1, mainWindow);
-					}, delay);
+					}, 2000);
 				}
 			})
 			.catch((error) => {
-				logError(
-					`[LemonadeStatusIndicator] Error during injection attempt ${attempt + 1}: ${error}`
-				);
+				// Only log error on the last attempt
+				if (attempt >= 9) {
+					logError(
+						`[LemonadeStatusIndicator] Error during injection after ${attempt + 1} attempts: ${error}`
+					);
+				}
 				// Retry after a delay
 				setTimeout(() => {
 					this.injectIndicatorWithRetry(html, attempt + 1, mainWindow);
-				}, 500);
+				}, 2000);
 			});
 	}
 
@@ -310,14 +299,8 @@ export class LemonadeStatusIndicator {
 			)
 			.then((result: any) => {
 				if (!result.success) {
-					logInfo(
-						`[LemonadeStatusIndicator] Status indicator update failed - missing elements: ${JSON.stringify(result.missing)}`
-					);
 					// Try to ensure the indicator is present if it's missing
 					if (result.missing.indicator) {
-						logInfo(
-							'[LemonadeStatusIndicator] Ensuring indicator presence after update failure...'
-						);
 						this.ensureIndicatorPresent(mainWindow);
 					}
 				}
