@@ -1,5 +1,5 @@
 import { app } from 'electron';
-import { logInfo, logError } from './logger';
+import { logInfo, logError, logPath } from './logger';
 import {
 	getAppInstallDir,
 	checkAndHandleAutoLaunchPrevention,
@@ -166,7 +166,7 @@ const runStartupFlow = async (): Promise<void> => {
 		logError('Startup failed: ' + (err && err.toString ? err.toString() : String(err)));
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
 			type: 'error',
-			message: 'Failed to start GAIA UI. Check logs.'
+			message: `Failed to start GAIA UI. Check logs at: ${logPath}`
 		});
 		windowManager.showErrorPage('Failed to start GAIA UI');
 	}
@@ -210,7 +210,7 @@ const runInstallationFlow = async (): Promise<void> => {
 		logError('Installation failed: ' + (err && err.toString ? err.toString() : String(err)));
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
 			type: 'error',
-			message: 'Installation failed. Check logs.'
+			message: `Installation failed. Check logs at: ${logPath}`
 		});
 		windowManager.showErrorPage('Installation failed');
 	}

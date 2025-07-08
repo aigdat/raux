@@ -180,6 +180,47 @@ RAUX can be installed:
 
 **Versioning**: Dual scheme (0.6.5+raux.0.2.0) with original OpenWebUI version (0.6.5) and RAUX (raux.0.2.0); Electron follows RAUX version (0.2.0).
 
+## Version Management
+
+RAUX uses a dual versioning scheme that must be updated in multiple files when incrementing versions:
+
+### Versioning Scheme
+- **Full Version**: `0.6.5+raux.0.2.3` (OpenWebUI base version + RAUX increment)
+- **Electron Version**: `0.2.3` (RAUX version only, without OpenWebUI base)
+
+### Files to Update When Incrementing Version
+1. **Root package.json** (`/package.json`):
+   - `"version": "0.6.5+raux.0.2.X"` - Main version source for build system
+   - `"openWebUIVersion": "0.6.5"` - Keep unchanged unless updating OpenWebUI base
+
+2. **Electron package.json** (`/raux-electron/package.json`):
+   - `"version": "0.2.X"` - Electron app version (RAUX version only)
+   - `"raux-version": "0.6.5+raux.0.2.X"` - Full RAUX version reference
+
+3. **CHANGELOG.md** (`/CHANGELOG.md`):
+   - Add new entry: `## [0.6.5+raux.0.2.X] - YYYY-MM-DD`
+   - Document changes in the new version
+
+### Version Propagation
+- **Python wheel**: Automatically reads from root package.json via `pyproject.toml`
+- **Backend runtime**: Gets version from package.json via `backend/open_webui/env.py`
+- **Frontend**: Build-time constants from package.json via `src/lib/constants.ts`
+- **Electron binary**: Webpack bundles embed version strings during build
+- **GitHub Actions**: Reads versions from both package.json files for build process
+
+### Build Verification
+After updating versions, verify with:
+```bash
+# Check TypeScript compilation
+npm run check
+
+# Build and verify Electron app
+cd raux-electron && npm run make
+
+# Verify no old version references remain
+rg "0\.2\.X" --type json  # Replace X with old version
+```
+
 ## Memories and Guidance
 
 - Remember that "node_modules" folder is not our code; its ok to reference but don't check for errors or lint

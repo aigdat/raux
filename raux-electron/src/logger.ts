@@ -26,3 +26,5 @@ export function logInfo(message: string) {
 export function logError(message: string) {
   log.error(message);
 }
+
+export { logPath };
