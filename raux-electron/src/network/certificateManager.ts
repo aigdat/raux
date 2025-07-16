@@ -10,13 +10,8 @@ import { getAppInstallDir } from '../envUtils';
 import { WindowsCertificateStore } from './windowsCertificateStore';
 
 export class CertificateManager implements ICertificateManager {
-  // File-based certificate paths for non-Windows systems
+  // File-based certificate paths for Linux systems
   private systemCertPaths: Record<string, string[]> = {
-    darwin: [
-      '/etc/ssl/cert.pem',
-      '/usr/local/etc/openssl/cert.pem',
-      '/opt/homebrew/etc/ca-certificates/cert.pem',
-    ],
     linux: [
       '/etc/ssl/certs/ca-certificates.crt',
       '/etc/pki/tls/certs/ca-bundle.crt',

@@ -11,8 +11,7 @@ GAIA UI includes automatic SSL certificate handling to support installations in 
 GAIA UI automatically uses your operating system's trusted certificates:
 
 1. **Windows**: Uses the Windows Certificate Store automatically
-2. **macOS**: Uses system keychain certificates
-3. **Linux**: Uses system-installed certificates
+2. **Linux**: Uses system-installed certificates
 
 **No manual configuration required** - If your browser can access HTTPS sites, GAIA UI will work too.
 
@@ -35,7 +34,7 @@ Set the `NODE_EXTRA_CA_CERTS` environment variable to point to your CA bundle:
 set NODE_EXTRA_CA_CERTS=C:\path\to\your\ca-bundle.crt
 ```
 
-**macOS/Linux:**
+**Linux:**
 ```bash
 export NODE_EXTRA_CA_CERTS=/path/to/your/ca-bundle.crt
 ```
@@ -44,7 +43,6 @@ export NODE_EXTRA_CA_CERTS=/path/to/your/ca-bundle.crt
 
 Place your CA bundle file (`ca-bundle.crt`) in the GAIA UI runtime directory:
 - Windows: `%LOCALAPPDATA%\GaiaUi\runtime\certificates\`
-- macOS: `~/Library/Application Support/GaiaUi/runtime/certificates/`
 - Linux: `~/.config/GaiaUi/runtime/certificates/`
 
 ## Troubleshooting

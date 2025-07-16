@@ -26,7 +26,7 @@ flowchart TD
     CheckCustom -->|Not Found| OSCerts{Platform?}
     
     OSCerts -->|Windows| WinStore[Windows Certificate Store<br/>via PowerShell]
-    OSCerts -->|macOS/Linux| SysCerts[System Certificate<br/>Files]
+    OSCerts -->|Linux| SysCerts[System Certificate<br/>Files]
     OSCerts -->|None Found| NodeDefault[Node.js Default<br/>OS Integration]
     
     UseCustom --> CreateAgent[Create HTTPS Agent<br/>with Certificates]
