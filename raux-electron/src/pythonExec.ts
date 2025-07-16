@@ -2,12 +2,12 @@ import { existsSync, mkdirSync, createWriteStream, rmSync } from 'fs';
 import { join } from 'path';
 import { getAppInstallDir, getPythonPath } from './envUtils';
 import * as os from 'os';
-import fetch from 'node-fetch';
 import extract from 'extract-zip';
 import { spawn } from 'child_process';
 import { logInfo, logError } from './logger';
 import { IPCManager } from './ipc/ipcManager';
 import { IPCChannels } from './ipc/ipcChannels';
+import { HttpClientFactory, HttpError } from './network';
 
 const PYTHON_VERSION = '3.11.8';
 const PYTHON_DIR = join(getAppInstallDir(), 'python');
@@ -17,6 +17,7 @@ class PythonExec {
   private static instance: PythonExec;
   private constructor() {}
   private ipcManager = IPCManager.getInstance();
+  private httpClient = HttpClientFactory.getClient();
 
   public static getInstance(): PythonExec {
     if (!PythonExec.instance) {
@@ -116,30 +117,37 @@ class PythonExec {
 
   private async downloadPython(url: string, zipPath: string): Promise<void> {
     logInfo('Downloading Python...');
-    return new Promise<void>((resolve, reject) => {
-      fetch(url)
-        .then(response => {
-          if (response.status !== 200) {
-            logError('Failed to download Python: ' + response.status);
-            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Environment not configurable.', step: 'python-download' });
-            reject(new Error('Failed to download Python: ' + response.status));
-            return;
-          }
-          const file = createWriteStream(zipPath);
-          response.body.pipe(file);
-          file.on('finish', () => {
-            file.close();
-            logInfo('Python download finished.');
-            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Runtime components downloaded.', step: 'python-download' });
-            resolve();
-          });
-        })
-        .catch(err => {
-          logError(`Download error: ${err}`);
-          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Environment download error.', step: 'python-download' });
-          reject(err);
+    try {
+      const response = await this.httpClient.download(url);
+      
+      if (response.status !== 200) {
+        logError('Failed to download Python: ' + response.status);
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Environment not configurable.', step: 'python-download' });
+        throw new Error('Failed to download Python: ' + response.status);
+      }
+      
+      const file = createWriteStream(zipPath);
+      response.body.pipe(file);
+      
+      await new Promise<void>((resolve, reject) => {
+        file.on('finish', () => {
+          file.close();
+          logInfo('Python download finished.');
+          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Runtime components downloaded.', step: 'python-download' });
+          resolve();
         });
-    });
+        file.on('error', reject);
+      });
+    } catch (error: any) {
+      logError(`Download error: ${error.message}`);
+      
+      if (error instanceof HttpError && error.isSSLError) {
+        this.handleSSLError(error);
+      } else {
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Environment download error.', step: 'python-download' });
+      }
+      throw error;
+    }
   }
 
   private async extractPython(zipPath: string, destDir: string): Promise<void> {
@@ -163,30 +171,39 @@ class PythonExec {
     this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'info', message: 'Preparing packaging resource...', step: 'pip-download' });
 
     // Download get-pip.py
-    await new Promise<void>((resolve, reject) => {
-      fetch(getPipUrl)
-        .then(response => {
-          if (response.status !== 200) {
-            logError('Failed to download get-pip.py: ' + response.status);
-            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to download packaging resource!', step: 'pip-download' });
-            reject(new Error('Failed to download get-pip.py: ' + response.status));
-            return;
-          }
-          const file = createWriteStream(getPipPath);
-          response.body.pipe(file);
-          file.on('finish', () => {
-            file.close();
-            logInfo('get-pip.py download finished.');
-            this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Packaging resource download finished.', step: 'pip-download' });
-            resolve();
-          });
-        })
-        .catch(err => {
-          logError(`Download error (get-pip.py): ${err}`);
-          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Packaging resource download error!', step: 'pip-download' });
-          reject(err);
+    try {
+      const response = await this.httpClient.download(getPipUrl);
+      
+      if (response.status !== 200) {
+        logError('Failed to download get-pip.py: ' + response.status);
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Failed to download packaging resource!', step: 'pip-download' });
+        throw new Error('Failed to download get-pip.py: ' + response.status);
+      }
+      
+      const file = createWriteStream(getPipPath);
+      response.body.pipe(file);
+      
+      await new Promise<void>((resolve, reject) => {
+        file.on('finish', () => {
+          file.close();
+          logInfo('get-pip.py download finished.');
+          this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { type: 'success', message: 'Packaging resource download finished.', step: 'pip-download' });
+          resolve();
         });
-    });
+        file.on('error', reject);
+      });
+    } catch (error: any) {
+      logError(`Download error (get-pip.py): ${error.message}`);
+      
+      if (error instanceof HttpError && error.isSSLError) {
+        this.handleSSLError(error);
+        // Mark SSL error for future attempts
+        HttpClientFactory.markSSLError();
+      } else {
+        this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Packaging resource download error!', step: 'pip-download' });
+      }
+      throw error;
+    }
     // Run get-pip.py
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(PYTHON_EXE, [getPipPath, '--no-warn-script-location'], { stdio: 'pipe' });
@@ -246,6 +263,37 @@ class PythonExec {
     } catch (err) {
       logError(`Failed to patch python*._pth: ${err}`);
     }
+  }
+
+  private handleSSLError(error: HttpError): void {
+    logError('SSL Certificate Error detected during installation');
+    
+    const suggestions = [
+      'Your organization may use custom SSL certificates.',
+      'To fix this issue, try one of the following:',
+      '',
+      '1. Set NODE_EXTRA_CA_CERTS environment variable:',
+      '   Windows: set NODE_EXTRA_CA_CERTS=C:\\path\\to\\ca-bundle.crt',
+      '   macOS/Linux: export NODE_EXTRA_CA_CERTS=/path/to/ca-bundle.crt',
+      '',
+      '2. Place your CA bundle file at:',
+      `   ${join(getAppInstallDir(), 'certificates', 'ca-bundle.crt')}`,
+      '',
+      '3. For testing only (insecure):',
+      '   set NODE_TLS_REJECT_UNAUTHORIZED=0',
+      '',
+      '4. Contact your IT administrator for the proper CA certificates.',
+    ];
+    
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
+      type: 'ssl_error',
+      message: 'SSL certificate verification failed',
+      details: {
+        error: error.message,
+        suggestions: suggestions,
+      },
+      step: 'ssl-error'
+    });
   }
 
   private async runCommand(cmd: string, args: string[], options?: any): Promise<{ code: number, stdout: string, stderr: string }> {

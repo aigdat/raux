@@ -1,18 +1,19 @@
-import { mkdirSync, existsSync, rmSync } from 'fs';
+import { mkdirSync, existsSync, rmSync, createWriteStream } from 'fs';
 import { join } from 'path';
-import fetch from 'node-fetch';
 import extract from 'extract-zip';
 import { python } from './pythonExec';
 import { getAppInstallDir } from './envUtils';
 import { logInfo, logError } from './logger';
 import { IPCManager } from './ipc/ipcManager';
 import { IPCChannels } from './ipc/ipcChannels';
+import { HttpClientFactory, HttpError } from './network';
 
 class RauxSetup {
 	private static instance: RauxSetup;
 	private static readonly RAUX_ENV = 'raux.env';
 	private constructor() {}
 	private ipcManager = IPCManager.getInstance();
+	private httpClient = HttpClientFactory.getClient();
 
 	public static getInstance(): RauxSetup {
 		if (!RauxSetup.instance) {
@@ -173,37 +174,42 @@ class RauxSetup {
 
 		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 			try {
+				const response = await this.httpClient.download(zipUrl);
+				
+				if (response.status !== 200) {
+					logError('Failed to download build context zip: ' + response.status);
+					throw new Error('Failed to download build context zip: ' + response.status);
+				}
+				
+				const file = createWriteStream(zipPath);
+				response.body.pipe(file);
+				
 				await new Promise<void>((resolve, reject) => {
-					fetch(zipUrl)
-						.then((response) => {
-							if (response.status !== 200) {
-								logError('Failed to download build context zip: ' + response.status);
-								reject(new Error('Failed to download build context zip: ' + response.status));
-								return;
-							}
-							const file = require('fs').createWriteStream(zipPath);
-							response.body.pipe(file);
-							file.on('finish', () => {
-								file.close();
-								logInfo('Build context zip download finished.');
-								this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
-									type: 'success',
-									message: 'GAIA UI components downloaded.',
-									step: 'raux-download'
-								});
-								resolve();
-							});
-						})
-						.catch((err) => {
-							logError(`Build context zip download error: ${err}`);
-							reject(err);
+					file.on('finish', () => {
+						file.close();
+						logInfo('Build context zip download finished.');
+						this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
+							type: 'success',
+							message: 'GAIA UI components downloaded.',
+							step: 'raux-download'
 						});
+						resolve();
+					});
+					file.on('error', reject);
 				});
+				
 				// Success - exit the retry loop
 				lastError = null;
 				break;
-			} catch (err) {
+			} catch (err: any) {
 				lastError = err as Error;
+				
+				// If it's an SSL error, mark it for future attempts
+				if (err instanceof HttpError && err.isSSLError) {
+					logError('SSL Certificate Error detected during RAUX download');
+					HttpClientFactory.markSSLError();
+				}
+				
 				if (attempt < maxAttempts) {
 					logInfo(`Download failed, retrying... (attempt ${attempt + 1}/${maxAttempts})`);
 					await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
