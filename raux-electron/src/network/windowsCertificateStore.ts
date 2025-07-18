@@ -19,7 +19,7 @@ export class WindowsCertificateStore {
       
       // PowerShell command to export root certificates in PEM format
       const psCommand = `
-        $certs = Get-ChildItem -Path Cert:\\LocalMachine\\Root
+        $certs = Get-ChildItem -Path Cert:\\\\LocalMachine\\\\Root
         $pemCerts = @()
         foreach ($cert in $certs) {
           $pemCert = @"
