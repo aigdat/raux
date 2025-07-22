@@ -95,12 +95,15 @@ export class SecureHttpClient implements IHttpClient {
     };
     
     // Only set ca if we have custom certificates
-    // If ca is undefined, Node.js will use the default OS certificate store
+    // If ca is undefined and win-ca is loaded on Windows, it will use Windows Certificate Store
     if (certificates.length > 0) {
       agentOptions.ca = certificates;
       logInfo(`[SecureHttpClient] Using ${certificates.length} custom certificate bundle(s)`);
+    } else if (process.platform === 'win32' && (global as any).__WIN_CA_LOADED__) {
+      logInfo('[SecureHttpClient] Using Windows Certificate Store via win-ca module');
+      // Don't set ca - let win-ca handle it
     } else {
-      logInfo('[SecureHttpClient] Using default OS certificate store');
+      logInfo('[SecureHttpClient] No custom certificates configured');
     }
     
     this.httpsAgent = new https.Agent(agentOptions);

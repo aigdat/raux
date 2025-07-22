@@ -121,11 +121,16 @@ export class CertificateManager implements ICertificateManager {
     
     logInfo(`[CertificateManager] Loading system certificates for platform: ${platform}`);
     
-    // For Windows, Node.js will automatically use the Windows Certificate Store
-    // when we don't provide custom certificates (ca is undefined)
-    // We only check for explicitly provided certificate files
+    // For Windows, check if win-ca module is loaded
+    // win-ca automatically loads Windows Certificate Store certificates into Node.js
     if (platform === 'win32') {
-      logInfo('[CertificateManager] On Windows - will use native certificate store unless custom certs are provided');
+      // Check if win-ca has been loaded (it modifies the global certificate handling)
+      const winCaLoaded = process.env.NODE_EXTRA_CA_CERTS || (global as any).__WIN_CA_LOADED__;
+      if (winCaLoaded) {
+        logInfo('[CertificateManager] On Windows - win-ca module detected, using Windows Certificate Store');
+      } else {
+        logInfo('[CertificateManager] On Windows - win-ca not detected, checking for manual certificate files');
+      }
       
       // Check common locations where tools like Git for Windows install certificates
       const windowsFallbackPaths = [

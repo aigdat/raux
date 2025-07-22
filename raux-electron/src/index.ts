@@ -1,3 +1,18 @@
+// Load Windows Certificate Store certificates into Node.js on Windows
+// This must be done early, before any HTTPS requests
+if (process.platform === 'win32') {
+	try {
+		// Use fallback mode for better Electron compatibility
+		require('win-ca/fallback');
+		// Set a global flag to indicate win-ca has been loaded
+		(global as any).__WIN_CA_LOADED__ = true;
+		console.log('[RAUX] Windows Certificate Store integration enabled');
+	} catch (error) {
+		console.error('[RAUX] Failed to load win-ca module:', error);
+		// Continue without win-ca - will fall back to manual certificate configuration
+	}
+}
+
 import { app } from 'electron';
 import { logInfo, logError, logPath } from './logger';
 import {
