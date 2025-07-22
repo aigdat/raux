@@ -184,7 +184,8 @@ const runStartupFlow = async (): Promise<void> => {
 			type: 'error',
 			message: `Failed to start GAIA UI. Check logs at: ${logPath}`
 		});
-		windowManager.showErrorPage('Failed to start GAIA UI');
+		// Don't navigate away - keep user on loading page to see error details
+		// windowManager.showErrorPage('Failed to start GAIA UI');
 	}
 };
 
@@ -236,7 +237,8 @@ const runInstallationFlow = async (): Promise<void> => {
 			type: 'error',
 			message: `Installation failed. Check logs at: ${logPath}`
 		});
-		windowManager.showErrorPage('Installation failed');
+		// Don't navigate away - keep user on loading page to see error details
+		// windowManager.showErrorPage('Installation failed');
 	}
 };
 

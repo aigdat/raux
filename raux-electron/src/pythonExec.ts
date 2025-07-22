@@ -197,8 +197,7 @@ class PythonExec {
       
       if (error instanceof HttpError && error.isSSLError) {
         this.handleSSLError(error);
-        // Mark SSL error for future attempts
-        HttpClientFactory.markSSLError();
+        // Don't mark SSL error here - let StandardHttpClient handle the retry automatically
       } else {
         this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, { type: 'error', message: 'Packaging resource download error!', step: 'pip-download' });
       }

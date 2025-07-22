@@ -204,10 +204,10 @@ class RauxSetup {
 			} catch (err: any) {
 				lastError = err as Error;
 				
-				// If it's an SSL error, mark it for future attempts
+				// If it's an SSL error, it will be automatically retried by StandardHttpClient
 				if (err instanceof HttpError && err.isSSLError) {
 					logError('SSL Certificate Error detected during RAUX download');
-					HttpClientFactory.markSSLError();
+					// Don't mark SSL error here - let StandardHttpClient handle the retry automatically
 				}
 				
 				if (attempt < maxAttempts) {

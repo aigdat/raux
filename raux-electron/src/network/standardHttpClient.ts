@@ -5,6 +5,7 @@ import fetch, { Response } from 'node-fetch';
 import { IHttpClient, IHttpResponse, DownloadOptions, RequestOptions, HttpError } from './types';
 import { Readable } from 'stream';
 import { logInfo, logError } from '../logger';
+import { HttpClientFactory } from './httpClientFactory';
 
 export class StandardHttpClient implements IHttpClient {
   async download(url: string, options?: DownloadOptions): Promise<IHttpResponse> {
@@ -19,7 +20,19 @@ export class StandardHttpClient implements IHttpClient {
       return this.mapResponse(response);
     } catch (error: any) {
       logError(`[StandardHttpClient] Download failed: ${error.message}`);
-      throw this.mapError(error);
+      const mappedError = this.mapError(error);
+      
+      // If it's an SSL error, mark it and let the factory retry with SecureHttpClient
+      if (mappedError instanceof HttpError && mappedError.isSSLError) {
+        logInfo('[StandardHttpClient] SSL error detected, marking for retry with SecureHttpClient');
+        HttpClientFactory.markSSLError();
+        // Get the new client (which will be SecureHttpClient) and retry
+        const secureClient = HttpClientFactory.getClient();
+        logInfo('[StandardHttpClient] Retrying with SecureHttpClient...');
+        return secureClient.download(url, options);
+      }
+      
+      throw mappedError;
     }
   }
 
@@ -37,7 +50,19 @@ export class StandardHttpClient implements IHttpClient {
       return this.mapResponse(response);
     } catch (error: any) {
       logError(`[StandardHttpClient] Request failed: ${error.message}`);
-      throw this.mapError(error);
+      const mappedError = this.mapError(error);
+      
+      // If it's an SSL error, mark it and let the factory retry with SecureHttpClient
+      if (mappedError instanceof HttpError && mappedError.isSSLError) {
+        logInfo('[StandardHttpClient] SSL error detected, marking for retry with SecureHttpClient');
+        HttpClientFactory.markSSLError();
+        // Get the new client (which will be SecureHttpClient) and retry
+        const secureClient = HttpClientFactory.getClient();
+        logInfo('[StandardHttpClient] Retrying with SecureHttpClient...');
+        return secureClient.get(url, options);
+      }
+      
+      throw mappedError;
     }
   }
 

@@ -6,4 +6,3 @@ export * from './httpClientFactory';
 export * from './standardHttpClient';
 export * from './secureHttpClient';
 export * from './certificateManager';
-export * from './windowsCertificateStore';

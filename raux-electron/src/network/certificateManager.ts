@@ -7,7 +7,6 @@ import { join } from 'path';
 import { ICertificateManager } from './types';
 import { logInfo, logError } from '../logger';
 import { getAppInstallDir } from '../envUtils';
-import { WindowsCertificateStore } from './windowsCertificateStore';
 
 export class CertificateManager implements ICertificateManager {
   // File-based certificate paths for Linux systems
@@ -25,37 +24,55 @@ export class CertificateManager implements ICertificateManager {
 
   async getCertificates(): Promise<Buffer[]> {
     if (this.cachedCertificates) {
+      logInfo('[CertificateManager] Using cached certificates');
       return this.cachedCertificates;
     }
 
+    logInfo('[CertificateManager] Starting certificate loading process...');
     const certs: Buffer[] = [];
     
     // 1. Check NODE_EXTRA_CA_CERTS environment variable (highest priority)
     if (process.env.NODE_EXTRA_CA_CERTS) {
-      logInfo(`[CertificateManager] Loading certificates from NODE_EXTRA_CA_CERTS: ${process.env.NODE_EXTRA_CA_CERTS}`);
+      logInfo(`[CertificateManager] NODE_EXTRA_CA_CERTS is set: ${process.env.NODE_EXTRA_CA_CERTS}`);
       try {
         const cert = await this.loadCertFile(process.env.NODE_EXTRA_CA_CERTS);
-        if (cert) certs.push(cert);
+        if (cert) {
+          certs.push(cert);
+          logInfo('[CertificateManager] Successfully loaded certificate from NODE_EXTRA_CA_CERTS');
+        }
       } catch (error) {
         logError(`[CertificateManager] Failed to load NODE_EXTRA_CA_CERTS: ${error}`);
       }
+    } else {
+      logInfo('[CertificateManager] NODE_EXTRA_CA_CERTS not set');
     }
     
     // 2. Check RAUX-specific certificate configuration
     const rauxCertPath = this.getRauxCertPath();
     if (rauxCertPath && existsSync(rauxCertPath)) {
-      logInfo(`[CertificateManager] Loading RAUX certificate from: ${rauxCertPath}`);
+      logInfo(`[CertificateManager] Found RAUX certificate at: ${rauxCertPath}`);
       try {
         const cert = await this.loadCertFile(rauxCertPath);
-        if (cert) certs.push(cert);
+        if (cert) {
+          certs.push(cert);
+          logInfo('[CertificateManager] Successfully loaded RAUX certificate');
+        }
       } catch (error) {
         logError(`[CertificateManager] Failed to load RAUX certificate: ${error}`);
       }
+    } else {
+      logInfo('[CertificateManager] No RAUX certificate found in expected locations');
     }
     
     // 3. Try to load system certificates
+    logInfo('[CertificateManager] Attempting to load system certificates...');
     const systemCerts = await this.loadSystemCertificates();
-    certs.push(...systemCerts);
+    if (systemCerts.length > 0) {
+      certs.push(...systemCerts);
+      logInfo(`[CertificateManager] Loaded ${systemCerts.length} system certificate bundle(s)`);
+    } else {
+      logInfo('[CertificateManager] No system certificates loaded');
+    }
     
     // If no certificates found and we're in a corporate environment, 
     // return empty array to let Node.js use its default certificate handling
@@ -68,7 +85,7 @@ export class CertificateManager implements ICertificateManager {
     // Cache the certificates
     this.cachedCertificates = certs;
     
-    logInfo(`[CertificateManager] Loaded ${certs.length} certificate bundle(s)`);
+    logInfo(`[CertificateManager] Total certificates loaded: ${certs.length}`);
     return certs;
   }
   
@@ -104,20 +121,13 @@ export class CertificateManager implements ICertificateManager {
     
     logInfo(`[CertificateManager] Loading system certificates for platform: ${platform}`);
     
-    // For Windows, try to extract from Windows Certificate Store
+    // For Windows, Node.js will automatically use the Windows Certificate Store
+    // when we don't provide custom certificates (ca is undefined)
+    // We only check for explicitly provided certificate files
     if (platform === 'win32') {
-      try {
-        const windowsCerts = await WindowsCertificateStore.getSystemCertificates();
-        certs.push(...windowsCerts);
-        if (windowsCerts.length > 0) {
-          logInfo('[CertificateManager] Successfully loaded certificates from Windows Certificate Store');
-          return certs;
-        }
-      } catch (error) {
-        logError(`[CertificateManager] Failed to load Windows Certificate Store: ${error}`);
-      }
+      logInfo('[CertificateManager] On Windows - will use native certificate store unless custom certs are provided');
       
-      // Fallback: Check common locations where tools like Git for Windows install certificates
+      // Check common locations where tools like Git for Windows install certificates
       const windowsFallbackPaths = [
         join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'mingw64', 'ssl', 'certs', 'ca-bundle.crt'),
         join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'usr', 'ssl', 'certs', 'ca-bundle.crt'),
