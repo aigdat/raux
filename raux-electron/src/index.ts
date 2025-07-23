@@ -3,10 +3,19 @@
 if (process.platform === 'win32') {
 	try {
 		// Use fallback mode for better Electron compatibility
-		require('win-ca/fallback');
+		const ca = require('win-ca/fallback');
+		
+		// Explicitly inject certificates into the global agent
+		// win-ca should do this automatically, but let's ensure it happens
+		ca.inject('+');  // Use '+' mode to add to existing certificates
+		
 		// Set a global flag to indicate win-ca has been loaded
 		(global as any).__WIN_CA_LOADED__ = true;
 		console.log('[RAUX] Windows Certificate Store integration enabled');
+		
+		// Log some debug info
+		const https = require('https');
+		console.log('[RAUX] Global agent CA count:', Array.isArray(https.globalAgent.options.ca) ? https.globalAgent.options.ca.length : 'not set');
 	} catch (error) {
 		console.error('[RAUX] Failed to load win-ca module:', error);
 		// Continue without win-ca - will fall back to manual certificate configuration
