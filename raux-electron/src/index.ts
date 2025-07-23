@@ -1,3 +1,27 @@
+// Load Windows Certificate Store certificates into Node.js on Windows
+// This must be done early, before any HTTPS requests
+if (process.platform === 'win32') {
+	try {
+		// Use fallback mode for better Electron compatibility
+		const ca = require('win-ca/fallback');
+		
+		// Explicitly inject certificates into the global agent
+		// win-ca should do this automatically, but let's ensure it happens
+		ca.inject('+');  // Use '+' mode to add to existing certificates
+		
+		// Set a global flag to indicate win-ca has been loaded
+		(global as any).__WIN_CA_LOADED__ = true;
+		console.log('[RAUX] Windows Certificate Store integration enabled');
+		
+		// Log some debug info
+		const https = require('https');
+		console.log('[RAUX] Global agent CA count:', Array.isArray(https.globalAgent.options.ca) ? https.globalAgent.options.ca.length : 'not set');
+	} catch (error) {
+		console.error('[RAUX] Failed to load win-ca module:', error);
+		// Continue without win-ca - will fall back to manual certificate configuration
+	}
+}
+
 import { app } from 'electron';
 import { logInfo, logError, logPath } from './logger';
 import {
@@ -184,7 +208,8 @@ const runStartupFlow = async (): Promise<void> => {
 			type: 'error',
 			message: `Failed to start GAIA UI. Check logs at: ${logPath}`
 		});
-		windowManager.showErrorPage('Failed to start GAIA UI');
+		// Don't navigate away - keep user on loading page to see error details
+		// windowManager.showErrorPage('Failed to start GAIA UI');
 	}
 };
 
@@ -236,7 +261,8 @@ const runInstallationFlow = async (): Promise<void> => {
 			type: 'error',
 			message: `Installation failed. Check logs at: ${logPath}`
 		});
-		windowManager.showErrorPage('Installation failed');
+		// Don't navigate away - keep user on loading page to see error details
+		// windowManager.showErrorPage('Installation failed');
 	}
 };
 

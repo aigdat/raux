@@ -183,7 +183,17 @@
     // Helper to render all messages
     function renderMessages() {
       statusDiv.innerHTML = messages.map(msg => {
-        if (msg.type === 'error') {
+        if (msg.type === 'error' || msg.type === 'ssl_error') {
+          // Check if this is an SSL error with suggestions
+          if (msg.type === 'ssl_error' && msg.details && msg.details.suggestions) {
+            let html = `<div style="color:#c0392b;font-weight:bold;margin-bottom:10px">${msg.message}</div>`;
+            html += `<div style="color:#e5e7eb;font-size:0.9em;text-align:left;margin-left:20px">`;
+            msg.details.suggestions.forEach(suggestion => {
+              html += `<div style="margin-bottom:4px">${suggestion}</div>`;
+            });
+            html += `</div>`;
+            return html;
+          }
           return `<div style="color:#c0392b">${msg.message}</div>`;
         }
         // if (msg.type === 'success') color = '#27ae60';
