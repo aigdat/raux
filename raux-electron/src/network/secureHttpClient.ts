@@ -32,8 +32,11 @@ export class SecureHttpClient implements IHttpClient {
     } catch (error: any) {
       logError(`[SecureHttpClient] Download failed: ${error.message}`);
       
-      // If it's an SSL error and we haven't tried with system certs, retry
-      if (this.isSSLError(error.message) && !this.httpsAgent) {
+      // If it's an SSL error and we haven't already used the global agent, retry
+      const winCaLoaded = process.platform === 'win32' && (global as any).__WIN_CA_LOADED__;
+      const usingGlobalAgent = winCaLoaded && this.httpsAgent === https.globalAgent;
+      
+      if (this.isSSLError(error.message) && !usingGlobalAgent) {
         logInfo('[SecureHttpClient] SSL error detected, retrying with system certificates');
         this.certificateManager.clearCache();
         this.httpsAgent = null;
@@ -86,7 +89,19 @@ export class SecureHttpClient implements IHttpClient {
     const certificates = await this.certificateManager.getCertificates();
     const rejectUnauthorized = this.certificateManager.shouldRejectUnauthorized();
     
-    // Create agent configuration
+    // Check if win-ca is loaded on Windows
+    const winCaLoaded = process.platform === 'win32' && (global as any).__WIN_CA_LOADED__;
+    
+    // If win-ca is loaded and we have no custom certificates, use the global agent
+    // which has been modified by win-ca to include Windows certificates
+    if (winCaLoaded && certificates.length === 0) {
+      logInfo('[SecureHttpClient] Using Windows Certificate Store via win-ca module (global agent)');
+      // Store reference to global agent so we know we're using it
+      this.httpsAgent = https.globalAgent as https.Agent;
+      return this.httpsAgent;
+    }
+    
+    // Otherwise, create a custom agent
     const agentOptions: https.AgentOptions = {
       rejectUnauthorized,
       // Additional options for better compatibility
@@ -95,13 +110,9 @@ export class SecureHttpClient implements IHttpClient {
     };
     
     // Only set ca if we have custom certificates
-    // If ca is undefined and win-ca is loaded on Windows, it will use Windows Certificate Store
     if (certificates.length > 0) {
       agentOptions.ca = certificates;
       logInfo(`[SecureHttpClient] Using ${certificates.length} custom certificate bundle(s)`);
-    } else if (process.platform === 'win32' && (global as any).__WIN_CA_LOADED__) {
-      logInfo('[SecureHttpClient] Using Windows Certificate Store via win-ca module');
-      // Don't set ca - let win-ca handle it
     } else {
       logInfo('[SecureHttpClient] No custom certificates configured');
     }
