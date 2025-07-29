@@ -7,11 +7,16 @@ import { getAppInstallDir } from './envUtils';
 import { logInfo, logError } from './logger';
 import { IPCManager } from './ipc/ipcManager';
 import { IPCChannels } from './ipc/ipcChannels';
+import { InstallationStrategy } from './installation/InstallationStrategy';
+import { InstallationStrategyFactory } from './installation/InstallationStrategyFactory';
 
 class RauxSetup {
 	private static instance: RauxSetup;
 	private static readonly RAUX_ENV = 'raux.env';
-	private constructor() {}
+	private installationStrategy: InstallationStrategy;
+	private constructor() {
+		this.installationStrategy = InstallationStrategyFactory.create();
+	}
 	private ipcManager = IPCManager.getInstance();
 
 	public static getInstance(): RauxSetup {
@@ -22,71 +27,12 @@ class RauxSetup {
 	}
 
 	public isRAUXInstalled(): boolean {
-		try {
-			logInfo('Checking if RAUX is already installed...');
-
-			// Check if .env file exists
-			const envFile = join(getAppInstallDir(), 'python', 'Lib', '.env');
-			if (!existsSync(envFile)) {
-				logInfo(`RAUX env file not found at: ${envFile}`);
-				return false;
-			}
-			logInfo(`RAUX env file found at: ${envFile}`);
-
-			// Check if open-webui executable exists
-			logInfo('Checking if open-webui executable exists...');
-			const { execSync } = require('child_process');
-			const openWebuiPath = join(getAppInstallDir(), 'python', 'Scripts', 'open-webui.exe');
-			if (!existsSync(openWebuiPath)) {
-				logInfo(`open-webui executable not found at: ${openWebuiPath}`);
-				return false;
-			}
-
-			// Try to run it with --help to verify it's functional
-			execSync(`"${openWebuiPath}" --help`, {
-				encoding: 'utf8',
-				timeout: 2000,
-				windowsHide: true
-			});
-
-			logInfo('RAUX installation verified successfully');
-			return true;
-		} catch (err) {
-			logError(`RAUX installation check failed: ${err}`);
-			return false;
-		}
+		return this.installationStrategy.isRAUXInstalled();
 	}
 
 	// Verification method for startup flow - no installation messages
 	public verifyInstallation(): boolean {
-		try {
-			// Check if .env file exists
-			const envFile = join(getAppInstallDir(), 'python', 'Lib', '.env');
-			if (!existsSync(envFile)) {
-				logInfo('RAUX verification: env file not found');
-				return false;
-			}
-
-			// Quick check if open-webui executable is available
-			const { execSync } = require('child_process');
-			const openWebuiPath = join(getAppInstallDir(), 'python', 'Scripts', 'open-webui.exe');
-			if (!existsSync(openWebuiPath)) {
-				logInfo('RAUX verification: executable not found');
-				return false;
-			}
-
-			execSync(`"${openWebuiPath}" --help`, {
-				encoding: 'utf8',
-				timeout: 2000,
-				windowsHide: true
-			});
-
-			logInfo('RAUX verification: passed');
-			return true;
-		} catch (err) {
-			logError(`RAUX verification failed: ${err}`);
-			return false;
-		}
+		return this.installationStrategy.isRAUXInstalled();
 	}
 
 	public async install(): Promise<void> {
@@ -276,64 +222,32 @@ class RauxSetup {
 		for (const whlFile of whlFiles) {
 			const wheelPath = path.join(extractDir, whlFile);
 
-			// Use app-specific cache directory to avoid permission issues
-			const pipCacheDir = path.join(getAppInstallDir(), 'python', 'pip-cache');
-			mkdirSync(pipCacheDir, { recursive: true });
-
-			const result = await python.runPipCommand([
-				'install',
-				wheelPath,
-				'--cache-dir',
-				pipCacheDir,
-				'--verbose',
-				'--no-warn-script-location'
-			]);
-
-			if (result.code === 0) {
+			try {
+				await this.installationStrategy.installRAUXWheel(wheelPath);
 				logInfo(`${whlFile} installed successfully.`);
 				this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 					type: 'success',
 					message: 'GAIA UI components installed successfully.',
 					step: 'raux-install'
 				});
-			} else {
-				logError(`Failed to install ${whlFile}. Exit code: ${result.code}`);
-				if (result.stderr) {
-					logError(`pip stderr output:\n${result.stderr}`);
-				}
-				if (result.stdout) {
-					logError(`pip stdout output:\n${result.stdout}`);
-				}
+			} catch (err) {
+				logError(`Failed to install ${whlFile}: ${err}`);
 				this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
 					type: 'error',
 					message: 'Failed to install GAIA environment.',
 					step: 'raux-install'
 				});
-				throw new Error(
-					`Failed to install ${whlFile}. Exit code: ${result.code}\nError: ${result.stderr}`
-				);
+				throw err;
 			}
 		}
 	}
 
 	private async copyEnvToPythonLib(extractDir: string): Promise<void> {
 		try {
-			if (process.platform !== 'win32') {
-				logError('copyEnvToPythonLib: Only supported on Windows.');
-
-				this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
-					type: 'error',
-					message: 'GAIA environment only supported on Windows.',
-					step: 'raux-env'
-				});
-
-				return;
-			}
-
 			const envFileName = RauxSetup.RAUX_ENV;
-
 			const srcEnv = join(extractDir, envFileName);
-			const destEnv = join(getAppInstallDir(), 'python', 'Lib', '.env');
+			const paths = this.installationStrategy.getPaths();
+			const destEnv = paths.envFile;
 
 			if (!existsSync(srcEnv)) {
 				logError(`copyEnvToPythonLib: Source ${envFileName} not found at ${srcEnv}`);
@@ -345,13 +259,7 @@ class RauxSetup {
 				return;
 			}
 
-			const libDir = join(getAppInstallDir(), 'python', 'Lib');
-			if (!existsSync(libDir)) {
-				mkdirSync(libDir, { recursive: true });
-			}
-
-			require('fs').copyFileSync(srcEnv, destEnv);
-			logInfo(`Copied ${envFileName} to ${destEnv}`);
+			await this.installationStrategy.copyEnvFile(srcEnv, destEnv);
 
 			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 				type: 'success',

@@ -148,10 +148,17 @@ class RauxProcessManager {
             '--workers', env.UVICORN_WORKERS || '1',
           ];
         } else {
-          const pythonDir = dirname(this.pythonPath);
-          const scriptsDir = join(pythonDir, 'Scripts');
-          const openWebuiExe = join(scriptsDir, 'open-webui.exe');
-          executable = openWebuiExe;
+          if (process.platform === 'win32') {
+            const pythonDir = dirname(this.pythonPath);
+            const scriptsDir = join(pythonDir, 'Scripts');
+            const openWebuiExe = join(scriptsDir, 'open-webui.exe');
+            executable = openWebuiExe;
+          } else {
+            // On Linux, open-webui is in venv/bin
+            const pythonDir = dirname(this.pythonPath);
+            const openWebuiExe = join(pythonDir, 'open-webui');
+            executable = openWebuiExe;
+          }
           args = ['serve'];
         }
         

@@ -20,7 +20,7 @@ const config: ForgeConfig = {
       '../backend/requirements.txt'
     ],
     executableName: 'raux',
-    icon: 'static/favicon.ico'
+    icon: process.platform === 'linux' ? 'static/gaia.png' : 'static/favicon.ico'
   },
   rebuildConfig: {},
   makers: [
@@ -31,8 +31,29 @@ const config: ForgeConfig = {
       setupIcon: 'static/favicon.ico'
     }),
     new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({})
+    new MakerRpm({
+      options: {
+        name: 'gaiaui',
+        productName: 'GAIA UI',
+        homepage: 'https://github.com/aigdat/raux',
+        icon: 'static/gaia.png',
+        categories: ['Development', 'Utility'],
+        mimeType: ['x-scheme-handler/gaiaui']
+      }
+    }),
+    new MakerDeb({
+      options: {
+        name: 'gaiaui',
+        productName: 'GAIA UI',
+        homepage: 'https://github.com/aigdat/raux',
+        icon: 'static/gaia.png',
+        categories: ['Development', 'Utility'],
+        mimeType: ['x-scheme-handler/gaiaui'],
+        section: 'devel',
+        priority: 'optional',
+        maintainer: 'AMD GAIA Team'
+      }
+    })
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),

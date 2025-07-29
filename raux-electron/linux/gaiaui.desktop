@@ -1,0 +1,16 @@
+[Desktop Entry]
+Name=GAIA UI
+Comment=AMD's AI platform with user-friendly web interface
+Exec=gaiaui %U
+Terminal=false
+Type=Application
+Icon=gaiaui
+Categories=Development;Utility;
+MimeType=x-scheme-handler/gaiaui;
+StartupNotify=true
+Keywords=AI;LLM;AMD;GAIA;Chat;
+Actions=new-window;
+
+[Desktop Action new-window]
+Name=New Window
+Exec=gaiaui --new-window

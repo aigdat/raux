@@ -135,7 +135,7 @@ jobs:
             CHANGELOG.md
             package.json
 
-  package-electron:
+  package-electron-windows:
     needs: [build-preparation, build-electron]
     runs-on: windows-latest
     steps:
@@ -185,4 +185,91 @@ jobs:
         with:
           name: raux-setup.exe.sha256
           path: raux-electron/out/make/squirrel.windows/x64/raux-setup.exe.sha256
+          retention-days: 7
+
+  package-electron-linux:
+    needs: [build-preparation, build-electron]
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact-suffix: ubuntu
+          - os: ubuntu-20.04
+            artifact-suffix: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Download build context
+        uses: actions/download-artifact@v4
+        with:
+          name: build-context
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: 'raux-electron/package-lock.json'
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot dpkg
+
+      - name: Install dependencies
+        run: |
+          cd raux-electron
+          npm ci
+
+      - name: Build Electron app (Linux)
+        run: |
+          cd raux-electron
+          export RAUX_VERSION='${{ needs.build-preparation.outputs.production_version }}'
+          npm run make
+
+      - name: List build artifacts
+        run: |
+          ls -la raux-electron/out/make/
+
+      - name: Create checksums for DEB package
+        run: |
+          DEB_PATH=$(find raux-electron/out/make/deb -name "*.deb" | head -1)
+          if [ -n "$DEB_PATH" ]; then
+            sha256sum "$DEB_PATH" > "$DEB_PATH.sha256"
+            echo "Created checksum for DEB: $(cat $DEB_PATH.sha256)"
+          fi
+
+      - name: Create checksums for RPM package
+        run: |
+          RPM_PATH=$(find raux-electron/out/make/rpm -name "*.rpm" | head -1)
+          if [ -n "$RPM_PATH" ]; then
+            sha256sum "$RPM_PATH" > "$RPM_PATH.sha256"
+            echo "Created checksum for RPM: $(cat $RPM_PATH.sha256)"
+          fi
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gaiaui-${{ matrix.artifact-suffix }}.deb
+          path: raux-electron/out/make/deb/**/*.deb
+          retention-days: 7
+
+      - name: Upload DEB checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: gaiaui-${{ matrix.artifact-suffix }}.deb.sha256
+          path: raux-electron/out/make/deb/**/*.deb.sha256
+          retention-days: 7
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gaiaui-${{ matrix.artifact-suffix }}.rpm
+          path: raux-electron/out/make/rpm/**/*.rpm
+          retention-days: 7
+
+      - name: Upload RPM checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: gaiaui-${{ matrix.artifact-suffix }}.rpm.sha256
+          path: raux-electron/out/make/rpm/**/*.rpm.sha256
           retention-days: 7 
