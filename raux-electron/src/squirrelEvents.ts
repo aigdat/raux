@@ -79,7 +79,7 @@ function createDesktopShortcut(updateExe: any, exeName: string): void {
 export function handleSquirrelEvent(): boolean {
   if (process.platform !== 'win32') return false;
   const squirrelEvent = process.argv[1];
-  const exeName = 'gaiaui.exe';
+  const exeName = 'gaia-ui.exe';
   const updateExe = path.resolve(process.execPath, '..', '..', 'Update.exe');
   switch (squirrelEvent) {
     case '--squirrel-uninstall':

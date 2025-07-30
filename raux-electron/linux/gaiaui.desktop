@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=GAIA UI
 Comment=AMD's AI platform with user-friendly web interface
-Exec=gaiaui %U
+Exec=gaia-ui %U
 Terminal=false
 Type=Application
 Icon=gaiaui
@@ -13,4 +13,4 @@ Actions=new-window;
 
 [Desktop Action new-window]
 Name=New Window
-Exec=gaiaui --new-window
+Exec=gaia-ui --new-window

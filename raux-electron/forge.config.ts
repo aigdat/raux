@@ -19,14 +19,14 @@ const config: ForgeConfig = {
       // The rest will be installed via the wheel
       '../backend/requirements.txt'
     ],
-    executableName: 'gaiaui',
+    executableName: 'gaia-ui',
     name: 'gaiaui' // This ensures the output directory doesn't have spaces
   },
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
       name: 'GaiaUi',
-      exe: 'gaiaui.exe',
+      exe: 'gaia-ui.exe',
       setupExe: 'raux-setup.exe',
       setupIcon: './static/favicon.ico'
     }),
@@ -49,7 +49,8 @@ const config: ForgeConfig = {
         mimeType: ['x-scheme-handler/gaiaui'],
         section: 'devel',
         priority: 'optional',
-        maintainer: 'AMD GAIA Team'
+        maintainer: 'AMD GAIA Team',
+        desktopTemplate: './linux/gaiaui.desktop'
       }
     })
   ],
