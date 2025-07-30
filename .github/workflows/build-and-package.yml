@@ -239,6 +239,13 @@ jobs:
 
       - name: List build artifacts
         run: |
+          echo "Contents of out directory:"
+          ls -la raux-electron/out/
+          echo "Contents of packaged app directory:"
+          ls -la raux-electron/out/*/
+          echo "Looking for executable:"
+          find raux-electron/out -name "raux" -type f -ls || echo "raux executable not found"
+          echo "Contents of make directory:"
           ls -la raux-electron/out/make/
 
       - name: Create checksums for DEB package
