@@ -189,14 +189,7 @@ jobs:
 
   package-electron-linux:
     needs: [build-preparation, build-electron]
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            artifact-suffix: ubuntu
-          - os: ubuntu-20.04
-            artifact-suffix: ubuntu-20.04
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - name: Download build context
         uses: actions/download-artifact@v4
@@ -268,27 +261,27 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gaiaui-${{ matrix.artifact-suffix }}.deb
+          name: gaiaui-ubuntu.deb
           path: raux-electron/out/make/deb/**/*.deb
           retention-days: 7
 
       - name: Upload DEB checksum
         uses: actions/upload-artifact@v4
         with:
-          name: gaiaui-${{ matrix.artifact-suffix }}.deb.sha256
+          name: gaiaui-ubuntu.deb.sha256
           path: raux-electron/out/make/deb/**/*.deb.sha256
           retention-days: 7
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gaiaui-${{ matrix.artifact-suffix }}.rpm
+          name: gaiaui-ubuntu.rpm
           path: raux-electron/out/make/rpm/**/*.rpm
           retention-days: 7
 
       - name: Upload RPM checksum
         uses: actions/upload-artifact@v4
         with:
-          name: gaiaui-${{ matrix.artifact-suffix }}.rpm.sha256
+          name: gaiaui-ubuntu.rpm.sha256
           path: raux-electron/out/make/rpm/**/*.rpm.sha256
           retention-days: 7 
