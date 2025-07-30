@@ -215,12 +215,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y rpm fakeroot dpkg
 
+      - name: Debug directory structure
+        run: |
+          echo "Current directory structure:"
+          ls -la
+          echo "Checking if backend exists:"
+          ls -la backend/ || echo "backend directory not found"
+          echo "Checking backend/requirements.txt:"
+          ls -la backend/requirements.txt || echo "requirements.txt not found"
+
       - name: Install dependencies
         run: |
           cd raux-electron
           npm ci
 
       - name: Build Electron app (Linux)
+        env:
+          CI: true
         run: |
           cd raux-electron
           export RAUX_VERSION='${{ needs.build-preparation.outputs.production_version }}'
