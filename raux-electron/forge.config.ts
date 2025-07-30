@@ -7,7 +7,6 @@ import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-nati
 import { WebpackPlugin } from '@electron-forge/plugin-webpack';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
-import * as path from 'path';
 
 import { mainConfig } from './webpack.main.config';
 import { rendererConfig } from './webpack.renderer.config';
@@ -20,8 +19,7 @@ const config: ForgeConfig = {
       // The rest will be installed via the wheel
       '../backend/requirements.txt'
     ],
-    executableName: 'raux',
-    icon: process.platform === 'linux' ? path.join(__dirname, 'static', 'gaia.png') : path.join(__dirname, 'static', 'favicon.ico')
+    executableName: 'raux'
   },
   rebuildConfig: {},
   makers: [
@@ -29,7 +27,7 @@ const config: ForgeConfig = {
       name: 'GaiaUi',
       exe: 'raux.exe',
       setupExe: 'raux-setup.exe',
-      setupIcon: path.join(__dirname, 'static', 'favicon.ico')
+      setupIcon: './static/favicon.ico'
     }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({
@@ -37,7 +35,6 @@ const config: ForgeConfig = {
         name: 'gaiaui',
         productName: 'GAIA UI',
         homepage: 'https://github.com/aigdat/raux',
-        icon: path.join(__dirname, 'static', 'gaia.png'),
         categories: ['Development', 'Utility'],
         mimeType: ['x-scheme-handler/gaiaui']
       }
@@ -47,7 +44,6 @@ const config: ForgeConfig = {
         name: 'gaiaui',
         productName: 'GAIA UI',
         homepage: 'https://github.com/aigdat/raux',
-        icon: path.join(__dirname, 'static', 'gaia.png'),
         categories: ['Development', 'Utility'],
         mimeType: ['x-scheme-handler/gaiaui'],
         section: 'devel',
