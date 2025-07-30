@@ -244,7 +244,8 @@ jobs:
           echo "Contents of packaged app directory:"
           ls -la raux-electron/out/*/
           echo "Looking for executable:"
-          find raux-electron/out -name "raux" -type f -ls || echo "raux executable not found"
+          find raux-electron/out -name "gaiaui" -type f -ls || echo "gaiaui executable not found"
+          find raux-electron/out -name "gaia-ui" -type f -ls || echo "gaia-ui executable not found"
           echo "Contents of make directory:"
           ls -la raux-electron/out/make/
 

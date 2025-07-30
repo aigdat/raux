@@ -19,14 +19,14 @@ const config: ForgeConfig = {
       // The rest will be installed via the wheel
       '../backend/requirements.txt'
     ],
-    executableName: 'raux',
+    executableName: 'gaiaui',
     name: 'gaiaui' // This ensures the output directory doesn't have spaces
   },
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
       name: 'GaiaUi',
-      exe: 'raux.exe',
+      exe: 'gaiaui.exe',
       setupExe: 'raux-setup.exe',
       setupIcon: './static/favicon.ico'
     }),
@@ -35,7 +35,6 @@ const config: ForgeConfig = {
       options: {
         name: 'gaiaui',
         productName: 'GAIA UI',
-        executableName: 'raux',
         homepage: 'https://github.com/aigdat/raux',
         categories: ['Development', 'Utility'],
         mimeType: ['x-scheme-handler/gaiaui']
@@ -45,7 +44,6 @@ const config: ForgeConfig = {
       options: {
         name: 'gaiaui',
         productName: 'GAIA UI',
-        executableName: 'raux',
         homepage: 'https://github.com/aigdat/raux',
         categories: ['Development', 'Utility'],
         mimeType: ['x-scheme-handler/gaiaui'],
