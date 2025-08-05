@@ -189,14 +189,7 @@ jobs:
 
   package-electron-linux:
     needs: [build-preparation, build-electron]
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            artifact-suffix: ubuntu
-          - os: ubuntu-20.04
-            artifact-suffix: ubuntu-20.04
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - name: Download build context
         uses: actions/download-artifact@v4
@@ -215,12 +208,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y rpm fakeroot dpkg
 
+      - name: Debug directory structure
+        run: |
+          echo "Current directory structure:"
+          ls -la
+          echo "Checking if backend exists:"
+          ls -la backend/ || echo "backend directory not found"
+          echo "Checking backend/requirements.txt:"
+          ls -la backend/requirements.txt || echo "requirements.txt not found"
+
       - name: Install dependencies
         run: |
           cd raux-electron
           npm ci
 
       - name: Build Electron app (Linux)
+        env:
+          CI: true
         run: |
           cd raux-electron
           export RAUX_VERSION='${{ needs.build-preparation.outputs.production_version }}'
@@ -228,6 +232,14 @@ jobs:
 
       - name: List build artifacts
         run: |
+          echo "Contents of out directory:"
+          ls -la raux-electron/out/
+          echo "Contents of packaged app directory:"
+          ls -la raux-electron/out/*/
+          echo "Looking for executable:"
+          find raux-electron/out -name "gaiaui" -type f -ls || echo "gaiaui executable not found"
+          find raux-electron/out -name "gaia-ui" -type f -ls || echo "gaia-ui executable not found"
+          echo "Contents of make directory:"
           ls -la raux-electron/out/make/
 
       - name: Create checksums for DEB package
@@ -249,27 +261,27 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gaiaui-${{ matrix.artifact-suffix }}.deb
+          name: gaiaui-ubuntu.deb
           path: raux-electron/out/make/deb/**/*.deb
           retention-days: 7
 
       - name: Upload DEB checksum
         uses: actions/upload-artifact@v4
         with:
-          name: gaiaui-${{ matrix.artifact-suffix }}.deb.sha256
+          name: gaiaui-ubuntu.deb.sha256
           path: raux-electron/out/make/deb/**/*.deb.sha256
           retention-days: 7
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gaiaui-${{ matrix.artifact-suffix }}.rpm
+          name: gaiaui-ubuntu.rpm
           path: raux-electron/out/make/rpm/**/*.rpm
           retention-days: 7
 
       - name: Upload RPM checksum
         uses: actions/upload-artifact@v4
         with:
-          name: gaiaui-${{ matrix.artifact-suffix }}.rpm.sha256
+          name: gaiaui-ubuntu.rpm.sha256
           path: raux-electron/out/make/rpm/**/*.rpm.sha256
           retention-days: 7 

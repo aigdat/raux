@@ -19,20 +19,40 @@ const config: ForgeConfig = {
       // The rest will be installed via the wheel
       '../backend/requirements.txt'
     ],
-    executableName: 'raux',
-    icon: 'static/favicon.ico'
+    executableName: 'gaia-ui',
+    name: 'gaiaui' // This ensures the output directory doesn't have spaces
   },
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
       name: 'GaiaUi',
-      exe: 'raux.exe',
+      exe: 'gaia-ui.exe',
       setupExe: 'raux-setup.exe',
-      setupIcon: 'static/favicon.ico'
+      setupIcon: './static/favicon.ico'
     }),
     new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({})
+    new MakerRpm({
+      options: {
+        name: 'gaiaui',
+        productName: 'GAIA UI',
+        homepage: 'https://github.com/aigdat/raux',
+        categories: ['Development', 'Utility'],
+        mimeType: ['x-scheme-handler/gaiaui']
+      }
+    }),
+    new MakerDeb({
+      options: {
+        name: 'gaiaui',
+        productName: 'GAIA UI',
+        homepage: 'https://github.com/aigdat/raux',
+        categories: ['Development', 'Utility'],
+        mimeType: ['x-scheme-handler/gaiaui'],
+        section: 'devel',
+        priority: 'optional',
+        maintainer: 'AMD GAIA Team',
+        desktopTemplate: './linux/gaiaui.desktop'
+      }
+    })
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),

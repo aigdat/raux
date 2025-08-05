@@ -12,11 +12,16 @@ export function getAppInstallDir() {
     // In dev, backend is at ../../backend relative to src
     return join(__dirname, '../../');
   }
-  // On Windows, use LOCALAPPDATA env var for AppData\Local
+  
   if (process.platform === 'win32') {
+    // On Windows, use LOCALAPPDATA env var for AppData\Local
     const localAppData = process.env.LOCALAPPDATA || join(os.homedir(), 'AppData', 'Local');
     // Store RAUX runtime in a subdirectory to avoid conflicts with Squirrel
     return join(localAppData, 'GaiaUi', 'runtime');
+  } else if (process.platform === 'linux') {
+    // On Linux, follow XDG Base Directory specification
+    const xdgDataHome = process.env.XDG_DATA_HOME || join(os.homedir(), '.local', 'share');
+    return join(xdgDataHome, 'gaiaui', 'runtime');
   }
 
   return join(app.getPath('appData'), 'GaiaUi', 'runtime');
@@ -43,9 +48,16 @@ export function getBackendDir() {
 // Python executable path
 export function getPythonPath() {
   if (isDev) {
-    return 'python'; // Use system Python in dev
+    return process.platform === 'win32' ? 'python' : 'python3'; // Use system Python in dev
   }
-  return join(getAppInstallDir(), 'python', process.platform === 'win32' ? 'python.exe' : 'bin/python3');
+  
+  if (process.platform === 'win32') {
+    return join(getAppInstallDir(), 'python', 'python.exe');
+  } else if (process.platform === 'linux') {
+    return join(getAppInstallDir(), 'venv', 'bin', 'python3');
+  }
+  
+  return join(getAppInstallDir(), 'python', 'bin', 'python3');
 }
 
 // Returns the correct path to a renderer asset (html, js) for dev and production
