@@ -1,4 +1,10 @@
 import { app } from 'electron';
+import { InstallationStrategyFactory } from './installation/InstallationStrategyFactory';
+
+// Apply platform-specific app configuration early
+const installationStrategy = InstallationStrategyFactory.create();
+installationStrategy.configureApp();
+
 import { logInfo, logError, logPath } from './logger';
 import {
 	getAppInstallDir,
@@ -24,7 +30,6 @@ declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 const RAUX_URL = 'http://localhost:8080';
-
 
 // Start both RAUX and Lemonade services if needed
 const startServices = async (): Promise<void> => {

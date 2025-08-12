@@ -1,9 +1,10 @@
+import { app } from 'electron';
 import { existsSync, mkdirSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { execSync, spawn } from 'child_process';
 import * as os from 'os';
 import { InstallationStrategy, InstallationPaths } from './InstallationStrategy';
-import { getAppInstallDir } from '../envUtils';
+import { getAppInstallDir, getBackendDir } from '../envUtils';
 import { IPCChannels } from '../ipc/ipcChannels';
 
 export class LinuxInstallationStrategy extends InstallationStrategy {
@@ -151,6 +152,54 @@ export class LinuxInstallationStrategy extends InstallationStrategy {
   getOpenWebUICommand(): string[] {
     const paths = this.getPaths();
     return [paths.openWebUIExecutable];
+  }
+
+  configureApp(): void {
+    // Disable sandbox in development mode on Linux to avoid permission issues
+    if (!app.isPackaged) {
+      app.commandLine.appendSwitch('no-sandbox');
+      this.logInfo('Development mode detected - disabling Chrome sandbox');
+    }
+  }
+
+  getRAUXStartCommand(isDev: boolean, env: NodeJS.ProcessEnv): { 
+    executable: string; 
+    args: string[]; 
+  } {
+    const paths = this.getPaths();
+    
+    if (isDev) {
+      // In dev mode on Linux, use dev.sh script - exactly like Windows uses start_windows.bat
+      // Developer is responsible for activating conda environment before running
+      const backendDir = getBackendDir();
+      const devScript = join(backendDir, 'dev.sh');
+      
+      if (existsSync(devScript)) {
+        return {
+          executable: '/bin/bash',
+          args: [devScript]
+        };
+      }
+      
+      // Fallback if dev.sh doesn't exist: run uvicorn directly
+      // Assumes developer has activated the proper environment
+      return {
+        executable: 'uvicorn',
+        args: [
+          'open_webui.main:app',
+          '--host', env.HOST || '0.0.0.0',
+          '--port', env.PORT || '8080',
+          '--forwarded-allow-ips', '*',
+          '--workers', env.UVICORN_WORKERS || '1',
+        ]
+      };
+    } else {
+      // In production, use the installed open-webui executable from venv
+      return {
+        executable: paths.openWebUIExecutable,
+        args: ['serve']
+      };
+    }
   }
 
   private async checkSystemPython(): Promise<string | null> {

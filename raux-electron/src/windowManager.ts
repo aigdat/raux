@@ -6,9 +6,18 @@ import { LemonadeStatus } from './ipc/ipcTypes';
 import { logInfo, logError } from './logger';
 import { lemonadeStatusIndicator } from './lemonade/statusIndicator';
 
+// Webpack-generated constants for entry points
+declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
+declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+
 const RAUX_URL = 'http://localhost:8080';
-const LOADING_PAGE = getRendererPath('pages', 'loading', 'loading.html');
-const PRELOAD_SCRIPT = getRendererPath('main_window', 'preload.js');
+// Use webpack constants when available (in production), fallback to getRendererPath for dev
+const LOADING_PAGE = typeof MAIN_WINDOW_WEBPACK_ENTRY !== 'undefined' 
+	? MAIN_WINDOW_WEBPACK_ENTRY 
+	: getRendererPath('pages', 'loading', 'loading.html');
+const PRELOAD_SCRIPT = typeof MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY !== 'undefined'
+	? MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY
+	: getRendererPath('main_window', 'preload.js');
 
 export class WindowManager {
 	private static instance: WindowManager;
@@ -39,7 +48,12 @@ export class WindowManager {
 		this.mainWindow.setMenuBarVisibility(false);
 		this.mainWindow.setTitle('AMD GAIA (OpenWebUI)');
 
-		this.mainWindow.loadFile(LOADING_PAGE);
+		// LOADING_PAGE is either a URL (from webpack) or a file path
+		if (LOADING_PAGE.startsWith('http://') || LOADING_PAGE.startsWith('file://')) {
+			this.mainWindow.loadURL(LOADING_PAGE);
+		} else {
+			this.mainWindow.loadFile(LOADING_PAGE);
+		}
 
 		this.ipcManager.registerRenderer(this.mainWindow.webContents.id, this.mainWindow.webContents);
 
@@ -136,7 +150,12 @@ export class WindowManager {
 
 	public showLoadingPage(): void {
 		if (this.mainWindow) {
-			this.mainWindow.loadFile(LOADING_PAGE);
+			// LOADING_PAGE is either a URL (from webpack) or a file path
+			if (LOADING_PAGE.startsWith('http://') || LOADING_PAGE.startsWith('file://')) {
+				this.mainWindow.loadURL(LOADING_PAGE);
+			} else {
+				this.mainWindow.loadFile(LOADING_PAGE);
+			}
 		}
 	}
 

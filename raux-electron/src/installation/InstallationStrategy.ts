@@ -39,6 +39,23 @@ export abstract class InstallationStrategy {
   
   abstract getOpenWebUICommand(): string[];
   
+  /**
+   * Configure app-level settings for the platform (called early in app initialization)
+   * This is where platform-specific configurations like sandbox settings should go
+   */
+  abstract configureApp(): void;
+  
+  /**
+   * Get the command to start RAUX backend server
+   * @param isDev - Whether running in development mode
+   * @param env - Environment variables object with HOST, PORT, etc.
+   * @returns Object with executable path and arguments
+   */
+  abstract getRAUXStartCommand(isDev: boolean, env: NodeJS.ProcessEnv): { 
+    executable: string; 
+    args: string[]; 
+  };
+  
   protected logInfo(message: string): void {
     logInfo(`[${this.getName()}] ${message}`);
   }

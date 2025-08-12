@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, createWriteStream, rmSync, copyFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { execSync, spawn } from 'child_process';
 import * as os from 'os';
 import fetch from 'node-fetch';
 import extract from 'extract-zip';
 import { InstallationStrategy, InstallationPaths } from './InstallationStrategy';
-import { getAppInstallDir } from '../envUtils';
+import { getAppInstallDir, getBackendDir, isDev } from '../envUtils';
 import { IPCChannels } from '../ipc/ipcChannels';
 
 const PYTHON_VERSION = '3.11.8';
@@ -148,6 +148,38 @@ export class WindowsInstallationStrategy extends InstallationStrategy {
   getOpenWebUICommand(): string[] {
     const paths = this.getPaths();
     return [paths.openWebUIExecutable];
+  }
+
+  configureApp(): void {
+    // No special app configuration needed for Windows
+    this.logInfo('Windows platform - no special app configuration required');
+  }
+
+  getRAUXStartCommand(isDev: boolean, env: NodeJS.ProcessEnv): { 
+    executable: string; 
+    args: string[]; 
+  } {
+    const paths = this.getPaths();
+    
+    if (isDev) {
+      // In dev mode on Windows, use start_windows.bat - exactly as current code does
+      const backendDir = getBackendDir();
+      const batPath = join(backendDir, 'start_windows.bat');
+      return {
+        executable: 'cmd.exe',
+        args: ['/c', batPath]
+      };
+    } else {
+      // In production, use the installed open-webui.exe from Scripts directory
+      // This matches the current code exactly: pythonDir/Scripts/open-webui.exe
+      const pythonDir = paths.pythonDir;
+      const scriptsDir = join(pythonDir, 'Scripts');
+      const openWebuiExe = join(scriptsDir, 'open-webui.exe');
+      return {
+        executable: openWebuiExe,
+        args: ['serve']
+      };
+    }
   }
 
   private getPythonDownloadUrl(): string {
