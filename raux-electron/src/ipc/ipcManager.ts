@@ -26,6 +26,11 @@ export class IPCManager {
   }
 
   public sendToAll(channel: string, ...args: any[]): void {
+    // Early return if no renderers exist to prevent IPC errors
+    if (this.renderers.size === 0) {
+      return;
+    }
+
     this.renderers.forEach((renderer, id) => {
       if (!renderer || renderer.isDestroyed()) {
         this.renderers.delete(id);
