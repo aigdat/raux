@@ -5,6 +5,8 @@ import { getRendererPath, isInstallationComplete } from './envUtils';
 import { LemonadeStatus } from './ipc/ipcTypes';
 import { logInfo, logError } from './logger';
 import { lemonadeStatusIndicator } from './lemonade/statusIndicator';
+import { WindowsStrategyFactory } from './windowsStrategy/WindowsStrategyFactory';
+import { WindowsStrategy } from './windowsStrategy/WindowsStrategy';
 
 // Webpack-generated constants for entry points
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
@@ -23,8 +25,11 @@ export class WindowManager {
 	private static instance: WindowManager;
 	private mainWindow: BrowserWindow | null = null;
 	private ipcManager = IPCManager.getInstance();
+	private windowsStrategy: WindowsStrategy;
 
-	private constructor() {}
+	private constructor() {
+		this.windowsStrategy = WindowsStrategyFactory.create();
+	}
 
 	public static getInstance(): WindowManager {
 		if (!WindowManager.instance) {
@@ -34,19 +39,9 @@ export class WindowManager {
 	}
 
 	public createMainWindow(): void {
-		this.mainWindow = new BrowserWindow({
-			height: 1024,
-			width: 1280,
-			webPreferences: {
-				preload: PRELOAD_SCRIPT,
-				contextIsolation: true,
-				nodeIntegration: false
-			},
-			show: true
-		});
-
-		this.mainWindow.setMenuBarVisibility(false);
-		this.mainWindow.setTitle('AMD GAIA (OpenWebUI)');
+		// Get platform-specific window options from strategy
+		const windowOptions = this.windowsStrategy.getWindowOptions();
+		this.mainWindow = new BrowserWindow(windowOptions);
 
 		// LOADING_PAGE is either a URL (from webpack) or a file path
 		if (LOADING_PAGE.startsWith('http://') || LOADING_PAGE.startsWith('file://')) {
@@ -55,98 +50,16 @@ export class WindowManager {
 			this.mainWindow.loadFile(LOADING_PAGE);
 		}
 
-		this.ipcManager.registerRenderer(this.mainWindow.webContents.id, this.mainWindow.webContents);
+		// Delegate window creation setup to strategy
+		this.windowsStrategy.handleWindowCreation(this.mainWindow);
 
-		this.mainWindow.on('close', () => this.destroyIcps());
-		this.mainWindow.on('closed', () => this.destroyIcps());
-
-		// Add event listeners to handle page refreshes and navigation
-		this.setupPageNavigationHandlers();
+		// Delegate navigation handlers setup to strategy
+		this.windowsStrategy.setupNavigationHandlers(this.mainWindow);
 	}
 
-	/**
-	 * Setup event handlers for page navigation and refresh
-	 */
-	private setupPageNavigationHandlers(): void {
-		if (!this.mainWindow) return;
+	// Navigation handlers are now handled by the platform-specific strategy
 
-		// Handle page refresh - reinject indicator when page reloads
-		this.mainWindow.webContents.on('did-start-navigation', (event, url) => {
-			logInfo(`[WindowManager] Page navigation started to: ${url}`);
-		});
-
-		this.mainWindow.webContents.on('did-finish-load', async () => {
-			const currentURL = this.mainWindow?.webContents.getURL();
-			logInfo(`[WindowManager] Page finished loading: ${currentURL}`);
-
-			// Only inject indicator if we're not on the loading page and installation is complete
-			if (currentURL && !currentURL.includes('loading.html')) {
-				const installationComplete = await isInstallationComplete();
-				if (installationComplete) {
-					logInfo('[WindowManager] Non-loading page loaded and installation complete - ensuring status indicator presence');
-					this.setupRefreshPrevention();
-
-					// Add a small delay to ensure DOM is fully ready
-					setTimeout(() => {
-						logInfo('[WindowManager] Starting indicator injection after DOM ready delay');
-						lemonadeStatusIndicator.ensureIndicatorPresent(this.mainWindow);
-					}, 500);
-				} else {
-					logInfo('[WindowManager] Installation not complete, skipping indicator injection');
-				}
-			} else {
-				logInfo('[WindowManager] Loading page detected, skipping indicator injection');
-			}
-		});
-
-		// Handle navigation within the app
-		this.mainWindow.webContents.on('did-navigate', async (event, url) => {
-			logInfo(`[WindowManager] Page navigated to: ${url}`);
-			// Check and reinject indicator after navigation only if installation is complete
-			const installationComplete = await isInstallationComplete();
-			if (installationComplete) {
-				setTimeout(() => {
-					lemonadeStatusIndicator.ensureIndicatorPresent(this.mainWindow);
-				}, 2000);
-			}
-		});
-
-		// Handle in-page navigation (like hash changes)
-		this.mainWindow.webContents.on('did-navigate-in-page', async (event, url) => {
-			logInfo(`[WindowManager] In-page navigation to: ${url}`);
-			// Check if indicator still exists, if not reinject - only if installation is complete
-			const installationComplete = await isInstallationComplete();
-			if (installationComplete) {
-				setTimeout(() => {
-					lemonadeStatusIndicator.ensureIndicatorPresent(this.mainWindow);
-				}, 2000);
-			}
-		});
-	}
-
-	/**
-	 * Setup refresh prevention mechanism
-	 */
-	private setupRefreshPrevention(): void {
-		if (!this.mainWindow) return;
-
-		this.mainWindow.webContents.executeJavaScript(`
-      // Override the default refresh behavior
-      document.addEventListener('keydown', function(e) {
-        // Prevent F5 and Ctrl+R
-        if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
-          e.preventDefault();
-          console.log('Page refresh prevented');
-          return false;
-        }
-      });
-
-      // Prevent context menu refresh option
-      document.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-      });
-    `);
-	}
+	// Refresh prevention is now handled by the platform-specific strategy
 
 	public showLoadingPage(): void {
 		if (this.mainWindow) {
@@ -177,8 +90,7 @@ export class WindowManager {
 	}
 
 	public destroyIcps() {
-		this.ipcManager.unregisterRenderer(this.mainWindow?.webContents.id);
-		this.ipcManager.unregisterAllRenderers();
+		// ICP cleanup is now handled by the platform-specific strategy when window events occur
 		this.mainWindow = null;
 	}
 
