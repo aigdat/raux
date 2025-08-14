@@ -147,6 +147,10 @@ const createWindow = async (): Promise<void> => {
 
 		windowManager.createMainWindow();
 
+		// Set up cleanup callback for window strategy to stop services before IPC cleanup
+		const strategy = windowManager.getWindowsStrategy();
+		strategy.setCleanupCallback(stopServices);
+
 		// Central routing based on installation status
 		await routeApplicationFlow();
 	} catch (err) {

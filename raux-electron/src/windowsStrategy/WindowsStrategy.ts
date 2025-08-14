@@ -3,9 +3,26 @@ import { IPCManager } from '../ipc/ipcManager';
 
 export abstract class WindowsStrategy {
   protected ipcManager: IPCManager;
+  private cleanupCallback: (() => Promise<void>) | null = null;
 
   constructor() {
     this.ipcManager = IPCManager.getInstance();
+  }
+
+  /**
+   * Set a cleanup callback to be called before IPC destruction
+   */
+  public setCleanupCallback(callback: () => Promise<void>): void {
+    this.cleanupCallback = callback;
+  }
+
+  /**
+   * Call the cleanup callback if set
+   */
+  protected async performCleanup(): Promise<void> {
+    if (this.cleanupCallback) {
+      await this.cleanupCallback();
+    }
   }
 
   /**

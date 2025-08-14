@@ -89,6 +89,10 @@ export class WindowManager {
 		return this.mainWindow;
 	}
 
+	public getWindowsStrategy(): WindowsStrategy {
+		return this.windowsStrategy;
+	}
+
 	public destroyIcps() {
 		// ICP cleanup is now handled by the platform-specific strategy when window events occur
 		this.mainWindow = null;
@@ -98,6 +102,8 @@ export class WindowManager {
 	 * Update Lemonade status visual indicator only (no title bar updates)
 	 */
 	public updateLemonadeStatus(status: LemonadeStatus): void {
-		lemonadeStatusIndicator.updateLemonadeStatus(status, this.mainWindow);
+		if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+			lemonadeStatusIndicator.updateLemonadeStatus(status, this.mainWindow);
+		}
 	}
 }

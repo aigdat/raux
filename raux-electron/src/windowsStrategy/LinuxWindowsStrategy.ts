@@ -47,7 +47,11 @@ export class LinuxWindowsStrategy extends WindowsStrategy {
     // Initial IPC registration - same as Windows
     this.ipcManager.registerRenderer(mainWindow.webContents.id, mainWindow.webContents);
 
-    mainWindow.on('close', () => this.destroyIcps(mainWindow));
+    mainWindow.on('close', async () => {
+      // Perform cleanup before destroying IPC connections
+      await this.performCleanup();
+      this.destroyIcps(mainWindow);
+    });
     mainWindow.on('closed', () => this.destroyIcps(mainWindow));
   }
 

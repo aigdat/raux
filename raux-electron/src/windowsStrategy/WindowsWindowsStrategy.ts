@@ -38,7 +38,11 @@ export class WindowsWindowsStrategy extends WindowsStrategy {
     // EXACT COPY of current main branch logic - register IPC immediately
     this.ipcManager.registerRenderer(mainWindow.webContents.id, mainWindow.webContents);
 
-    mainWindow.on('close', () => this.destroyIcps(mainWindow));
+    mainWindow.on('close', async () => {
+      // Perform cleanup before destroying IPC connections
+      await this.performCleanup();
+      this.destroyIcps(mainWindow);
+    });
     mainWindow.on('closed', () => this.destroyIcps(mainWindow));
   }
 
