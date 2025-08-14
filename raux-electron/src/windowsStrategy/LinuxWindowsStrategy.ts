@@ -145,7 +145,13 @@ export class LinuxWindowsStrategy extends WindowsStrategy {
   }
 
   private destroyIcps(mainWindow: BrowserWindow) {
-    this.ipcManager.unregisterRenderer(mainWindow?.webContents.id);
+    try {
+      if (!mainWindow.isDestroyed()) {
+        this.ipcManager.unregisterRenderer(mainWindow.webContents.id);
+      }
+    } catch (error) {
+      // Window/webContents already destroyed, ignore the error
+    }
     this.ipcManager.unregisterAllRenderers();
   }
 }
