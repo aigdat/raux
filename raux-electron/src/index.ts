@@ -31,10 +31,10 @@ declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 const RAUX_URL = 'http://localhost:8080';
 
-// Start both RAUX and Lemonade services if needed
-const startServices = async (): Promise<void> => {
-	try {
-		// Always start Lemonade in hybrid mode
+// Start Lemonade service if supported by platform
+const startLemonadeService = async (): Promise<void> => {
+	// Only attempt Lemonade if platform supports it
+	if (installationStrategy.shouldUseLemonade()) {
 		logInfo('Starting Lemonade server...');
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 			type: 'info',
@@ -55,6 +55,28 @@ const startServices = async (): Promise<void> => {
 				message: 'Lemonade unavailable.'
 			});
 		}
+	} else {
+		logInfo(`Lemonade disabled on ${installationStrategy.getName()} platform`);
+		ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
+			type: 'info',
+			message: 'Lemonade not supported on this platform.'
+		});
+	}
+};
+
+// Start Lemonade status monitoring if supported by platform
+const startLemonadeMonitoring = async (): Promise<void> => {
+	if (installationStrategy.shouldUseLemonade()) {
+		await lemonadeStatusMonitor.startMonitoring();
+	} else {
+		logInfo(`Lemonade monitoring disabled on ${installationStrategy.getName()} platform`);
+	}
+};
+
+// Start both RAUX and Lemonade services if needed
+const startServices = async (): Promise<void> => {
+	try {
+		await startLemonadeService();
 
 		// Start RAUX backend
 		logInfo('Starting RAUX backend process...');
@@ -98,16 +120,18 @@ logInfo(`RAUX Version: ${process.env.RAUX_VERSION || 'latest'}`);
 const ipcManager = IPCManager.getInstance();
 const windowManager = WindowManager.getInstance();
 
-// Set up Lemonade status monitoring
-lemonadeStatusMonitor.on('statusChange', (status) => {
-	// Update window title with status
-	windowManager.updateLemonadeStatus(status);
+// Set up Lemonade status monitoring (only if platform supports it)
+if (installationStrategy.shouldUseLemonade()) {
+	lemonadeStatusMonitor.on('statusChange', (status) => {
+		// Update window title with status
+		windowManager.updateLemonadeStatus(status);
 
-	// Send status to renderer processes via IPC
-	ipcManager.sendToAll(IPCChannels.LEMONADE_STATUS, status);
+		// Send status to renderer processes via IPC
+		ipcManager.sendToAll(IPCChannels.LEMONADE_STATUS, status);
 
-	logInfo(`[Main] Lemonade status: ${status.status} (healthy: ${status.isHealthy})`);
-});
+		logInfo(`[Main] Lemonade status: ${status.status} (healthy: ${status.isHealthy})`);
+	});
+}
 
 const createWindow = async (): Promise<void> => {
 	try {
@@ -175,9 +199,6 @@ const runStartupFlow = async (): Promise<void> => {
 
 		await startServices();
 
-		// Start monitoring Lemonade status
-		await lemonadeStatusMonitor.startMonitoring();
-
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 			type: 'info',
 			message: 'Connecting to GAIA UI...'
@@ -219,9 +240,6 @@ const runInstallationFlow = async (): Promise<void> => {
 
 		await startServices();
 
-		// Start monitoring Lemonade status
-		await lemonadeStatusMonitor.startMonitoring();
-
 		ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
 			type: 'info',
 			message: 'Initializing GAIA UI...'
@@ -247,7 +265,7 @@ const runInstallationFlow = async (): Promise<void> => {
 
 const pollBackend = () => {
 	fetch(RAUX_URL)
-		.then((response) => {
+		.then(async (response) => {
 			logInfo(`Backend connected successfully - Status: ${response.status}`);
 			ipcManager.sendToAll(IPCChannels.INSTALLATION_COMPLETE, {
 				type: 'success',
@@ -257,6 +275,10 @@ const pollBackend = () => {
 				type: 'success',
 				message: 'Launching GAIA...'
 			});
+			
+			// Start Lemonade monitoring now that the app is ready
+			await startLemonadeMonitoring();
+			
 			windowManager.showMainApp();
 		})
 		.catch((error) => {
@@ -297,8 +319,10 @@ const stopServices = async () => {
 	logInfo('Stopping services...');
 	servicesStopped = true;
 
-	// Stop status monitoring
-	lemonadeStatusMonitor.stopMonitoring();
+	// Stop Lemonade monitoring if it was started
+	if (installationStrategy.shouldUseLemonade()) {
+		lemonadeStatusMonitor.stopMonitoring();
+	}
 
 	// Stop both services
 	rauxProcessManager.stopRaux();

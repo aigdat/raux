@@ -2,6 +2,7 @@ import { request } from 'http';
 import { getAppInstallDir } from '../envUtils';
 import { logInfo, logError } from '../logger';
 import { lemonadeClient } from './client';
+import { InstallationStrategyFactory } from '../installation/InstallationStrategyFactory';
 
 class LemonadeProcessManager {
 	private static readonly MAX_RESTART_ATTEMPTS = 3;
@@ -12,11 +13,13 @@ class LemonadeProcessManager {
 
 	private restartAttempts = 0;
 	private healthCheckInterval: NodeJS.Timeout | null = null;
+	private installationStrategy = InstallationStrategyFactory.create();
 
 	constructor() {
 		const installDir = getAppInstallDir();
 
 		logInfo(`[LemonadeProcessManager] installDir: ${installDir}`);
+		logInfo(`[LemonadeProcessManager] platform: ${this.installationStrategy.getName()}, shouldUseLemonade: ${this.installationStrategy.shouldUseLemonade()}`);
 	}
 
 	async isLemonadeAvailable(): Promise<boolean> {
@@ -60,6 +63,12 @@ class LemonadeProcessManager {
 
 	async startLemonade(envOverrides: Record<string, string> = {}) {
 		try {
+			// Check if platform should use Lemonade
+			if (!this.installationStrategy.shouldUseLemonade()) {
+				logInfo(`[LemonadeProcessManager] Lemonade disabled on ${this.installationStrategy.getName()} platform`);
+				return false;
+			}
+
 			// Check if Lemonade is available
 			if (!(await this.isLemonadeAvailable())) {
 				logInfo('[LemonadeProcessManager] Lemonade not available on system');

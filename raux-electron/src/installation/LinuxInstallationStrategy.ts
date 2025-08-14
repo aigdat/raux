@@ -162,6 +162,11 @@ export class LinuxInstallationStrategy extends InstallationStrategy {
     }
   }
 
+  shouldUseLemonade(): boolean {
+    // Linux should never use Lemonade - lemonade-server-dev is not on PATH
+    return false;
+  }
+
   getRAUXStartCommand(isDev: boolean, env: NodeJS.ProcessEnv): { 
     executable: string; 
     args: string[]; 

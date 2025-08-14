@@ -56,6 +56,12 @@ export abstract class InstallationStrategy {
     args: string[]; 
   };
   
+  /**
+   * Determines if Lemonade server should be used on this platform
+   * @returns true if Lemonade should be attempted, false to skip entirely
+   */
+  abstract shouldUseLemonade(): boolean;
+  
   protected logInfo(message: string): void {
     logInfo(`[${this.getName()}] ${message}`);
   }

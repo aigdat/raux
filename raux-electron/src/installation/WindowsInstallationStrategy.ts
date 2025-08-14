@@ -155,6 +155,11 @@ export class WindowsInstallationStrategy extends InstallationStrategy {
     this.logInfo('Windows platform - no special app configuration required');
   }
 
+  shouldUseLemonade(): boolean {
+    // Windows should attempt to use Lemonade if available
+    return true;
+  }
+
   getRAUXStartCommand(isDev: boolean, env: NodeJS.ProcessEnv): { 
     executable: string; 
     args: string[]; 
