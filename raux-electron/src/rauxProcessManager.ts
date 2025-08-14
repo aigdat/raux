@@ -1,6 +1,6 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { existsSync, copyFileSync, readFileSync, writeFileSync, appendFileSync, openSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { isDev, getAppInstallDir, getBackendDir } from './envUtils';
 import { logInfo, logError } from './logger';
 import { python } from './pythonExec';
@@ -41,8 +41,8 @@ class RauxProcessManager {
 
   // TODO: remove this ... it should auto generate!
   ensureSecretKey(): string {
-    const keyFile = join(this.backendDir, '.webui_secret_key');
-    const keyDir = this.backendDir;
+    const keyFile = join(getAppInstallDir(), '.webui_secret_key');
+    const keyDir = dirname(keyFile);
     if (!existsSync(keyDir)) {
       // Ensure parent directory exists
       require('fs').mkdirSync(keyDir, { recursive: true });
