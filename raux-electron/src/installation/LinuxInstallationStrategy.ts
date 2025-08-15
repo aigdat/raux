@@ -138,15 +138,41 @@ export class LinuxInstallationStrategy extends InstallationStrategy {
     }
   }
 
-  async copyEnvFile(srcPath: string, destPath: string): Promise<void> {
-    const destDir = dirname(destPath);
+  async copyEnvFile(extractDir: string): Promise<void> {
+    const srcEnv = join(extractDir, 'raux.env');
     
+    if (!existsSync(srcEnv)) {
+      this.logError(`copyEnvFile: Source raux.env not found at ${srcEnv}`);
+      throw new Error('raux.env not found in extract directory');
+    }
+
+    // Find the Python lib directory in the virtual environment
+    const libDir = join(this.virtualEnvPath, 'lib');
+    if (!existsSync(libDir)) {
+      this.logError(`Virtual environment lib directory not found at ${libDir}`);
+      throw new Error('Virtual environment lib directory not found');
+    }
+
+    // Find the Python version directory (e.g., python3.11, python3.12)
+    const fs = require('fs');
+    const pythonDirs = fs.readdirSync(libDir).filter((dir: string) => dir.startsWith('python3.'));
+    
+    if (pythonDirs.length === 0) {
+      this.logError(`No Python version directory found in ${libDir}`);
+      throw new Error('No Python version directory found in virtual environment');
+    }
+
+    // Use the first (and typically only) Python version directory found
+    const pythonVersionDir = pythonDirs[0];
+    const destEnv = join(libDir, pythonVersionDir, '.env');
+    
+    const destDir = dirname(destEnv);
     if (!existsSync(destDir)) {
       mkdirSync(destDir, { recursive: true });
     }
     
-    copyFileSync(srcPath, destPath);
-    this.logInfo(`Copied env file to ${destPath}`);
+    copyFileSync(srcEnv, destEnv);
+    this.logInfo(`Copied raux.env from ${srcEnv} to ${destEnv}`);
   }
 
 

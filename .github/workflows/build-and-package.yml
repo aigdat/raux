@@ -68,6 +68,7 @@ jobs:
         run: |
           mkdir build-context
           cp dist/*.whl build-context/
+          cp raux.env build-context/
 
       - name: Create build context zip
         run: |

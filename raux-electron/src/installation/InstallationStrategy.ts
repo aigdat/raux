@@ -35,7 +35,7 @@ export abstract class InstallationStrategy {
   
   abstract installRAUXWheel(wheelPath: string): Promise<void>;
   
-  abstract copyEnvFile(srcPath: string, destPath: string): Promise<void>;
+  abstract copyEnvFile(extractDir: string): Promise<void>;
   
   abstract getOpenWebUICommand(): string[];
   

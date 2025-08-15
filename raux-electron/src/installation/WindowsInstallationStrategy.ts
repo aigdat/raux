@@ -133,16 +133,23 @@ export class WindowsInstallationStrategy extends InstallationStrategy {
     }
   }
 
-  async copyEnvFile(srcPath: string, destPath: string): Promise<void> {
+  async copyEnvFile(extractDir: string): Promise<void> {
     const paths = this.getPaths();
-    const libDir = join(paths.pythonDir, 'Lib');
+    const srcEnv = join(extractDir, 'raux.env');
+    const destEnv = paths.envFile; // This is python/Lib/.env
     
+    if (!existsSync(srcEnv)) {
+      this.logError(`copyEnvFile: Source raux.env not found at ${srcEnv}`);
+      throw new Error('raux.env not found in extract directory');
+    }
+
+    const libDir = dirname(destEnv);
     if (!existsSync(libDir)) {
       mkdirSync(libDir, { recursive: true });
     }
     
-    copyFileSync(srcPath, destPath);
-    this.logInfo(`Copied env file to ${destPath}`);
+    copyFileSync(srcEnv, destEnv);
+    this.logInfo(`Copied raux.env from ${srcEnv} to ${destEnv}`);
   }
 
 

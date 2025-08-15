@@ -233,6 +233,31 @@ class RauxSetup {
 				throw err;
 			}
 		}
+
+		// Copy environment configuration to the correct location
+		this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
+			type: 'info',
+			message: 'Configuring GAIA UI environment...',
+			step: 'raux-env'
+		});
+
+		try {
+			await this.installationStrategy.copyEnvFile(extractDir);
+			logInfo('Environment configuration completed successfully.');
+			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
+				type: 'success',
+				message: 'GAIA UI configuration completed.',
+				step: 'raux-env'
+			});
+		} catch (err) {
+			logError(`Failed to configure environment: ${err}`);
+			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
+				type: 'error',
+				message: 'GAIA environment configuration failed.',
+				step: 'raux-env'
+			});
+			throw err;
+		}
 	}
 
 }
