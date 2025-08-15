@@ -37,6 +37,8 @@ export abstract class InstallationStrategy {
   
   abstract copyEnvFile(srcPath: string, destPath: string): Promise<void>;
   
+  abstract ensureRuntimeEnvFile(): void;
+  
   abstract getOpenWebUICommand(): string[];
   
   /**

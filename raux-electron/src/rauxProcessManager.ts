@@ -30,13 +30,9 @@ class RauxProcessManager {
   }
 
   ensureEnvFile() {
-    const envPath = join(this.backendDir, '.env');
-    const envExamplePath = join(this.backendDir, '.env.example');
-    if (!existsSync(envPath) && existsSync(envExamplePath)) {
-      copyFileSync(envExamplePath, envPath);
-    }
-
-    logInfo('[RauxProcessManager] Ensured .env file');
+    // Use the installation strategy to ensure the .env file is in the correct location
+    this.installationStrategy.ensureRuntimeEnvFile();
+    logInfo('[RauxProcessManager] Ensured .env file using installation strategy');
   }
 
   // TODO: remove this ... it should auto generate!
