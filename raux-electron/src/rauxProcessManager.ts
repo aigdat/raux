@@ -1,5 +1,5 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
-import { existsSync, copyFileSync, readFileSync, writeFileSync, appendFileSync, openSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, openSync } from 'fs';
 import { join, dirname } from 'path';
 import { isDev, getAppInstallDir, getBackendDir } from './envUtils';
 import { logInfo, logError } from './logger';
@@ -29,11 +29,6 @@ class RauxProcessManager {
     logInfo(`[RauxProcessManager] logPath: ${this.logPath}`);
   }
 
-  ensureEnvFile() {
-    // Use the installation strategy to ensure the .env file is in the correct location
-    this.installationStrategy.ensureRuntimeEnvFile();
-    logInfo('[RauxProcessManager] Ensured .env file using installation strategy');
-  }
 
   // TODO: remove this ... it should auto generate!
   ensureSecretKey(): string {
@@ -102,8 +97,6 @@ class RauxProcessManager {
   async startRaux(envOverrides: Record<string, string> = {}) {
     try {
       logInfo('[RauxProcessManager] Starting RAUX backend...');
-      
-      this.ensureEnvFile();
       
       const secretKey = this.ensureSecretKey();
 

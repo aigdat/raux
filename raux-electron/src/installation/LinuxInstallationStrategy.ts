@@ -149,29 +149,6 @@ export class LinuxInstallationStrategy extends InstallationStrategy {
     this.logInfo(`Copied env file to ${destPath}`);
   }
 
-  ensureRuntimeEnvFile(): void {
-    const paths = this.getPaths();
-    const installedEnvFile = paths.envFile; // This is appInstallDir/.env
-    const backendDir = getBackendDir();
-    const runtimeEnvFile = join(backendDir, '.env');
-
-    if (existsSync(installedEnvFile)) {
-      // Copy the installed .env to backend directory if needed
-      if (!existsSync(runtimeEnvFile)) {
-        const backendDirExists = existsSync(backendDir);
-        if (!backendDirExists) {
-          mkdirSync(backendDir, { recursive: true });
-        }
-        
-        copyFileSync(installedEnvFile, runtimeEnvFile);
-        this.logInfo(`Copied installed env file from ${installedEnvFile} to ${runtimeEnvFile}`);
-      } else {
-        this.logInfo(`Runtime env file already exists at ${runtimeEnvFile}`);
-      }
-    } else {
-      this.logError(`Installed env file not found at ${installedEnvFile}`);
-    }
-  }
 
   getOpenWebUICommand(): string[] {
     const paths = this.getPaths();

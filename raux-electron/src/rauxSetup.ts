@@ -12,7 +12,6 @@ import { InstallationStrategyFactory } from './installation/InstallationStrategy
 
 class RauxSetup {
 	private static instance: RauxSetup;
-	private static readonly RAUX_ENV = 'raux.env';
 	private installationStrategy: InstallationStrategy;
 	private constructor() {
 		this.installationStrategy = InstallationStrategyFactory.create();
@@ -61,12 +60,6 @@ class RauxSetup {
 				step: 'raux-install'
 			});
 			await this.installRAUXWheel(tmpDir);
-			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
-				type: 'info',
-				message: 'Configuring GAIA UI environment...',
-				step: 'raux-env'
-			});
-			await this.copyEnvToPythonLib(tmpDir);
 			if (tmpDir) {
 				try {
 					rmSync(tmpDir, { recursive: true, force: true });
@@ -242,39 +235,6 @@ class RauxSetup {
 		}
 	}
 
-	private async copyEnvToPythonLib(extractDir: string): Promise<void> {
-		try {
-			const envFileName = RauxSetup.RAUX_ENV;
-			const srcEnv = join(extractDir, envFileName);
-			const paths = this.installationStrategy.getPaths();
-			const destEnv = paths.envFile;
-
-			if (!existsSync(srcEnv)) {
-				logError(`copyEnvToPythonLib: Source ${envFileName} not found at ${srcEnv}`);
-				this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
-					type: 'error',
-					message: 'GAIA environment not found.',
-					step: 'raux-env'
-				});
-				return;
-			}
-
-			await this.installationStrategy.copyEnvFile(srcEnv, destEnv);
-
-			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, {
-				type: 'success',
-				message: 'GAIA UI configuration completed.',
-				step: 'raux-env'
-			});
-		} catch (err) {
-			logError(`copyEnvToPythonLib failed: ${err}`);
-			this.ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
-				type: 'error',
-				message: 'GAIA environment configuration failed.',
-				step: 'raux-env'
-			});
-		}
-	}
 }
 
 export const raux = RauxSetup.getInstance();
