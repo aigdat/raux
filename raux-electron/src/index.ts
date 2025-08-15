@@ -66,11 +66,7 @@ const startLemonadeService = async (): Promise<void> => {
 
 // Start Lemonade status monitoring if supported by platform
 const startLemonadeMonitoring = async (): Promise<void> => {
-	if (installationStrategy.shouldUseLemonade()) {
-		await lemonadeStatusMonitor.startMonitoring();
-	} else {
-		logInfo(`Lemonade monitoring disabled on ${installationStrategy.getName()} platform`);
-	}
+	await lemonadeStatusMonitor.startMonitoring();
 };
 
 // Start both RAUX and Lemonade services if needed
@@ -120,18 +116,16 @@ logInfo(`RAUX Version: ${process.env.RAUX_VERSION || 'latest'}`);
 const ipcManager = IPCManager.getInstance();
 const windowManager = WindowManager.getInstance();
 
-// Set up Lemonade status monitoring (only if platform supports it)
-if (installationStrategy.shouldUseLemonade()) {
-	lemonadeStatusMonitor.on('statusChange', (status) => {
-		// Update window title with status
-		windowManager.updateLemonadeStatus(status);
+// Set up Lemonade status monitoring
+lemonadeStatusMonitor.on('statusChange', (status) => {
+	// Update window title with status
+	windowManager.updateLemonadeStatus(status);
 
-		// Send status to renderer processes via IPC
-		ipcManager.sendToAll(IPCChannels.LEMONADE_STATUS, status);
+	// Send status to renderer processes via IPC
+	ipcManager.sendToAll(IPCChannels.LEMONADE_STATUS, status);
 
-		logInfo(`[Main] Lemonade status: ${status.status} (healthy: ${status.isHealthy})`);
-	});
-}
+	logInfo(`[Main] Lemonade status: ${status.status} (healthy: ${status.isHealthy})`);
+});
 
 const createWindow = async (): Promise<void> => {
 	try {
