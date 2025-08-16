@@ -4,7 +4,7 @@ import { join, dirname } from 'path';
 import { execSync, spawn } from 'child_process';
 import * as os from 'os';
 import fetch from 'node-fetch';
-import { extract } from 'tar';
+import * as tar from 'tar';
 import { InstallationStrategy, InstallationPaths } from './InstallationStrategy';
 import { getAppInstallDir, getBackendDir } from '../envUtils';
 import { IPCChannels } from '../ipc/ipcChannels';
@@ -253,7 +253,7 @@ export class LinuxInstallationStrategy extends InstallationStrategy {
   private async extractPython(tarPath: string, destDir: string): Promise<void> {
     this.logInfo('Extracting Python...');
     try {
-      await extract({
+      await tar.extract({
         file: tarPath,
         cwd: destDir,
         strip: 1 // Remove the top-level directory from extraction
