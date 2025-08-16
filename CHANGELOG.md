@@ -5,10 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.5+raux.0.2.3] - 2025-07-08
+## [0.6.5+raux.0.2.3] - 2025-08-16
 
-### Changes
-- **🐛 Bug Fix** Include path to error log in installation failure messages (Issue #110)
+### Added
+- **🐧 Linux Platform Support**: Complete Linux support implementation enabling RAUX to run natively on Linux systems
+- **🔄 Cross-Platform Python Isolation**: Unified Python environment strategy across Windows and Linux with standalone Python distributions
+- **📦 Enhanced Installation Process**: Improved installation reliability and user experience for both Windows and Linux platforms
+
+### Changed
+- **⚙️ Unified Installation Strategy**: Streamlined installation approach using identical Python isolation methods across all supported platforms
+- **🏗️ Build System Improvements**: Enhanced CI/CD pipeline compatibility and dependency management for multi-platform support
 
 ## [0.6.5+raux.0.2.2] - 2025-07-01
 

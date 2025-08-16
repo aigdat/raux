@@ -242,46 +242,36 @@ jobs:
           echo "Contents of make directory:"
           ls -la raux-electron/out/make/
 
-      - name: Create checksums for DEB package
+      - name: Rename DEB package and create checksum
+        id: deb-checksum
         run: |
           DEB_PATH=$(find raux-electron/out/make/deb -name "*.deb" | head -1)
           if [ -n "$DEB_PATH" ]; then
-            sha256sum "$DEB_PATH" > "$DEB_PATH.sha256"
-            echo "Created checksum for DEB: $(cat $DEB_PATH.sha256)"
+            DEB_DIR=$(dirname "$DEB_PATH")
+            RENAMED_DEB="$DEB_DIR/raux-setup.deb"
+            mv "$DEB_PATH" "$RENAMED_DEB"
+            sha256sum "$RENAMED_DEB" > "$RENAMED_DEB.sha256"
+            echo "Renamed DEB to: $RENAMED_DEB"
+            echo "Created checksum for DEB: $(cat $RENAMED_DEB.sha256)"
+            echo "deb_path=$RENAMED_DEB" >> $GITHUB_OUTPUT
+            echo "deb_checksum_path=$RENAMED_DEB.sha256" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create checksums for RPM package
-        run: |
-          RPM_PATH=$(find raux-electron/out/make/rpm -name "*.rpm" | head -1)
-          if [ -n "$RPM_PATH" ]; then
-            sha256sum "$RPM_PATH" > "$RPM_PATH.sha256"
-            echo "Created checksum for RPM: $(cat $RPM_PATH.sha256)"
-          fi
 
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
+        if: steps.deb-checksum.outputs.deb_path != ''
         with:
           name: gaiaui-ubuntu.deb
-          path: raux-electron/out/make/deb/**/*.deb
+          path: ${{ steps.deb-checksum.outputs.deb_path }}
           retention-days: 7
 
       - name: Upload DEB checksum
         uses: actions/upload-artifact@v4
+        if: steps.deb-checksum.outputs.deb_checksum_path != ''
         with:
           name: gaiaui-ubuntu.deb.sha256
-          path: raux-electron/out/make/deb/**/*.deb.sha256
+          path: ${{ steps.deb-checksum.outputs.deb_checksum_path }}
           retention-days: 7
 
-      - name: Upload RPM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: gaiaui-ubuntu.rpm
-          path: raux-electron/out/make/rpm/**/*.rpm
-          retention-days: 7
-
-      - name: Upload RPM checksum
-        uses: actions/upload-artifact@v4
-        with:
-          name: gaiaui-ubuntu.rpm.sha256
-          path: raux-electron/out/make/rpm/**/*.rpm.sha256
-          retention-days: 7 
+ 

@@ -38,6 +38,21 @@ jobs:
           name: raux-wheel-context
           path: ./release-artifacts
 
+      - name: Download gaiaui-ubuntu.deb artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: gaiaui-ubuntu.deb
+          path: ./release-artifacts
+
+      - name: Download gaiaui-ubuntu.deb.sha256 artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: gaiaui-ubuntu.deb.sha256
+          path: ./release-artifacts
+
+
       - name: Create GitHub Release and Upload Artifacts
         uses: softprops/action-gh-release@v1
         with:
@@ -48,5 +63,7 @@ jobs:
             release-artifacts/raux-setup.exe
             release-artifacts/raux-setup.exe.sha256
             release-artifacts/raux-wheel-context.zip
+            release-artifacts/*.deb
+            release-artifacts/*.deb.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
