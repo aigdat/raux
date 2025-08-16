@@ -126,7 +126,7 @@ export class LemonadeClient extends BaseCliRunner {
 
 		try {
 			const config = this.getLemonadeServerConfig();
-			const healthUrl = `http://localhost:${config.port}/api/v0/health`;
+			const healthUrl = `http://localhost:${config.port}/api/v1/health`;
 
 			// Use fetch with timeout
 			const controller = new AbortController();

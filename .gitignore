@@ -6,6 +6,7 @@ node_modules
 .env
 .env.*
 !.env.example
+!backend/.env
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 # Byte-compiled / optimized / DLL files
@@ -312,4 +313,5 @@ version.txt
 
 # static files
 **/*Zone.Identifier
-raux-electron/python/
+**/python/
+**/pip-cache/

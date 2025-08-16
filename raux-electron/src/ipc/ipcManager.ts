@@ -26,17 +26,30 @@ export class IPCManager {
   }
 
   public sendToAll(channel: string, ...args: any[]): void {
+    // Early return if no renderers exist to prevent IPC errors
+    if (this.renderers.size === 0) {
+      return;
+    }
+
     this.renderers.forEach((renderer, id) => {
-      if (renderer.isDestroyed()) {
+      if (!renderer || renderer.isDestroyed()) {
         this.renderers.delete(id);
         return;
       }
 
       try {
         renderer.send(channel, ...args);
-      } catch (err) {
-        // Optionally log the error
-        // console.error(`IPC sendToAll error: ${err}`);
+      } catch (err: any) {
+        // Silently handle expected renderer disposal errors
+        if (err?.message?.includes('Render frame was disposed') || 
+            err?.message?.includes('WebFrameMain could be accessed') ||
+            err?.message?.includes('Object has been destroyed')) {
+          // Clean up silently - this is normal when windows close or navigate
+          this.renderers.delete(id);
+          return;
+        }
+        // Only log truly unexpected errors
+        console.error(`IPC sendToAll error: ${err}`);
       }
     });
   }

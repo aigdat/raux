@@ -1,9 +1,11 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
-import { existsSync, copyFileSync, readFileSync, writeFileSync, appendFileSync, openSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, openSync } from 'fs';
 import { join, dirname } from 'path';
 import { isDev, getAppInstallDir, getBackendDir } from './envUtils';
 import { logInfo, logError } from './logger';
 import { python } from './pythonExec';
+import { InstallationStrategyFactory } from './installation/InstallationStrategyFactory';
+import { InstallationStrategy } from './installation/InstallationStrategy';
 
 class RauxProcessManager {
   private rauxProcess: ChildProcessWithoutNullStreams | null = null;
@@ -11,8 +13,10 @@ class RauxProcessManager {
   private backendDir: string;
   private status: 'starting' | 'running' | 'stopped' | 'crashed' = 'stopped';
   private logPath: string;
+  private installationStrategy: InstallationStrategy;
 
   constructor() {
+    this.installationStrategy = InstallationStrategyFactory.create();
     const installDir = getAppInstallDir();
     this.pythonPath = python.getPath();
     this.backendDir = getBackendDir();
@@ -25,20 +29,11 @@ class RauxProcessManager {
     logInfo(`[RauxProcessManager] logPath: ${this.logPath}`);
   }
 
-  ensureEnvFile() {
-    const envPath = join(this.backendDir, '.env');
-    const envExamplePath = join(this.backendDir, '.env.example');
-    if (!existsSync(envPath) && existsSync(envExamplePath)) {
-      copyFileSync(envExamplePath, envPath);
-    }
-
-    logInfo('[RauxProcessManager] Ensured .env file');
-  }
 
   // TODO: remove this ... it should auto generate!
   ensureSecretKey(): string {
-    const keyFile = join(this.backendDir, '.webui_secret_key');
-    const keyDir = this.backendDir;
+    const keyFile = join(getAppInstallDir(), '.webui_secret_key');
+    const keyDir = dirname(keyFile);
     if (!existsSync(keyDir)) {
       // Ensure parent directory exists
       require('fs').mkdirSync(keyDir, { recursive: true });
@@ -103,8 +98,6 @@ class RauxProcessManager {
     try {
       logInfo('[RauxProcessManager] Starting RAUX backend...');
       
-      this.ensureEnvFile();
-      
       const secretKey = this.ensureSecretKey();
 
       // Set up environment variables
@@ -123,50 +116,20 @@ class RauxProcessManager {
       // Ensure log file exists
       if (!existsSync(this.logPath)) openSync(this.logPath, 'w');
       
-      // Windows dev mode: use start_windows.bat
-      if (isDev && process.platform === 'win32') {
-        const batPath = join(this.backendDir, 'start_windows.bat');
-        logInfo(`[RauxProcessManager] Spawning RAUX backend via start_windows.bat: ${batPath}`);
-        logInfo(`[RauxProcessManager] CWD: ${this.backendDir}`);
-        this.rauxProcess = spawn('cmd.exe', ['/c', batPath], {
-          cwd: this.backendDir,
-          env,
-          stdio: 'pipe',
-          shell: false,
-        });
-      } else {
-        // Choose executable and args based on dev/prod
-        let executable: string;
-        let args: string[];
-        if (isDev) {
-          executable = 'uvicorn';
-          args = [
-            'open_webui.main:app',
-            '--host', env.HOST!,
-            '--port', env.PORT!,
-            '--forwarded-allow-ips', '*',
-            '--workers', env.UVICORN_WORKERS || '1',
-          ];
-        } else {
-          const pythonDir = dirname(this.pythonPath);
-          const scriptsDir = join(pythonDir, 'Scripts');
-          const openWebuiExe = join(scriptsDir, 'open-webui.exe');
-          executable = openWebuiExe;
-          args = ['serve'];
-        }
-        
-        logInfo(`[RauxProcessManager] Spawning RAUX backend:`);
-        logInfo(`[RauxProcessManager] - Executable: ${executable}`);
-        logInfo(`[RauxProcessManager] - Args: ${JSON.stringify(args)}`);
-        logInfo(`[RauxProcessManager] - CWD: ${this.backendDir}`);
+      // Use InstallationStrategy to get platform-specific command
+      const { executable, args } = this.installationStrategy.getRAUXStartCommand(isDev, env);
+      
+      logInfo(`[RauxProcessManager] Spawning RAUX backend:`);
+      logInfo(`[RauxProcessManager] - Executable: ${executable}`);
+      logInfo(`[RauxProcessManager] - Args: ${JSON.stringify(args)}`);
+      logInfo(`[RauxProcessManager] - CWD: ${this.backendDir}`);
 
-        this.rauxProcess = spawn(executable, args, {
-          cwd: this.backendDir,
-          env,
-          stdio: 'pipe',
-          shell: false,
-        });
-      }
+      this.rauxProcess = spawn(executable, args, {
+        cwd: this.backendDir,
+        env,
+        stdio: 'pipe',
+        shell: false,
+      });
       this.rauxProcess.stdout.on('data', (data) => {
         appendFileSync(this.logPath, data.toString());
         if (this.status === 'starting') this.status = 'running';

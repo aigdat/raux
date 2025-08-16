@@ -29,6 +29,7 @@
     "@electron/fuses": "^1.8.0",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
+    "@types/tar": "^6.1.13",
     "@vercel/webpack-asset-relocator-loader": "^1.7.3",
     "copy-webpack-plugin": "^13.0.0",
     "css-loader": "^6.11.0",
@@ -47,6 +48,7 @@
     "electron-log": "^5.4.0",
     "electron-squirrel-startup": "^1.0.1",
     "extract-zip": "^2.0.1",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "tar": "^7.4.3"
   }
 }
