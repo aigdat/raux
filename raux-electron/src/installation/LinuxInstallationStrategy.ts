@@ -1,19 +1,20 @@
 import { app } from 'electron';
-import { existsSync, mkdirSync, copyFileSync } from 'fs';
+import { existsSync, mkdirSync, copyFileSync, createWriteStream, rmSync, chmodSync } from 'fs';
 import { join, dirname } from 'path';
 import { execSync, spawn } from 'child_process';
 import * as os from 'os';
+import fetch from 'node-fetch';
+import { extract } from 'tar';
 import { InstallationStrategy, InstallationPaths } from './InstallationStrategy';
 import { getAppInstallDir, getBackendDir } from '../envUtils';
 import { IPCChannels } from '../ipc/ipcChannels';
 
-export class LinuxInstallationStrategy extends InstallationStrategy {
-  private virtualEnvPath: string;
+const PYTHON_VERSION = '3.11.8';
+const PYTHON_BUILD_VERSION = '20240224';
 
+export class LinuxInstallationStrategy extends InstallationStrategy {
   constructor() {
     super();
-    const appInstallDir = getAppInstallDir();
-    this.virtualEnvPath = join(appInstallDir, 'venv');
   }
 
   getName(): string {
@@ -22,14 +23,15 @@ export class LinuxInstallationStrategy extends InstallationStrategy {
 
   getPaths(): InstallationPaths {
     const appInstallDir = getAppInstallDir();
+    const pythonDir = join(appInstallDir, 'python');
     
     return {
       appInstallDir,
-      pythonDir: this.virtualEnvPath,
-      pythonExecutable: join(this.virtualEnvPath, 'bin', 'python3'),
-      pipExecutable: join(this.virtualEnvPath, 'bin', 'pip3'),
-      openWebUIExecutable: join(this.virtualEnvPath, 'bin', 'open-webui'),
-      envFile: join(appInstallDir, '.env')
+      pythonDir,
+      pythonExecutable: join(pythonDir, 'bin', 'python3'),
+      pipExecutable: join(pythonDir, 'bin', 'python3'),
+      openWebUIExecutable: join(pythonDir, 'bin', 'open-webui'),
+      envFile: join(pythonDir, 'lib', 'python3.11', '.env')
     };
   }
 
@@ -71,9 +73,8 @@ export class LinuxInstallationStrategy extends InstallationStrategy {
   async setupPythonEnvironment(): Promise<void> {
     const paths = this.getPaths();
     
-    // Check if virtual environment already exists
-    if (existsSync(paths.pythonDir) && existsSync(paths.pythonExecutable)) {
-      this.logInfo('Python virtual environment already exists, skipping creation.');
+    if (existsSync(paths.pythonDir)) {
+      this.logInfo('Python directory already exists, skipping installation.');
       this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { 
         type: 'success', 
         message: 'Runtime environment already configured.', 
@@ -82,37 +83,36 @@ export class LinuxInstallationStrategy extends InstallationStrategy {
       return;
     }
 
-    // Check system Python version
-    const pythonVersion = await this.checkSystemPython();
-    if (!pythonVersion) {
-      throw new Error('Python 3.11 or higher is required but not found on the system');
-    }
+    mkdirSync(paths.pythonDir, { recursive: true });
+    
+    const url = this.getPythonDownloadUrl();
+    const tarPath = join(paths.pythonDir, 'python-standalone.tar.gz');
 
     this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { 
       type: 'info', 
-      message: 'Creating Python virtual environment...', 
-      step: 'python-venv' 
-    });
-
-    // Create parent directory if it doesn't exist
-    const parentDir = dirname(paths.pythonDir);
-    if (!existsSync(parentDir)) {
-      mkdirSync(parentDir, { recursive: true });
-    }
-
-    // Create virtual environment
-    await this.createVirtualEnvironment();
-
-    // Upgrade pip in virtual environment
-    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { 
-      type: 'info', 
-      message: 'Upgrading pip in virtual environment...', 
-      step: 'pip-upgrade' 
+      message: 'Downloading runtime components...', 
+      step: 'python-download' 
     });
     
-    await this.upgradePip();
-
-    this.logInfo('Python virtual environment setup completed successfully.');
+    await this.downloadPython(url, tarPath);
+    
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { 
+      type: 'info', 
+      message: 'Extracting runtime libraries...', 
+      step: 'python-extract' 
+    });
+    
+    await this.extractPython(tarPath, paths.pythonDir);
+    
+    this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { 
+      type: 'info', 
+      message: 'Configuring package management...', 
+      step: 'pip-install' 
+    });
+    
+    await this.ensurePipInstalled();
+    
+    this.logInfo('Python standalone installation completed successfully.');
     this.ipcManager.sendToAll(IPCChannels.INSTALLATION_STATUS, { 
       type: 'success', 
       message: 'Runtime environment ready.', 
@@ -139,36 +139,18 @@ export class LinuxInstallationStrategy extends InstallationStrategy {
   }
 
   async copyEnvFile(extractDir: string): Promise<void> {
+    const paths = this.getPaths();
     const srcEnv = join(extractDir, 'raux.env');
+    const destEnv = paths.envFile; // This is python/lib/python3.11/.env
     
     if (!existsSync(srcEnv)) {
       this.logError(`copyEnvFile: Source raux.env not found at ${srcEnv}`);
       throw new Error('raux.env not found in extract directory');
     }
 
-    // Find the Python lib directory in the virtual environment
-    const libDir = join(this.virtualEnvPath, 'lib');
+    const libDir = dirname(destEnv);
     if (!existsSync(libDir)) {
-      this.logError(`Virtual environment lib directory not found at ${libDir}`);
-      throw new Error('Virtual environment lib directory not found');
-    }
-
-    // Find the Python version directory (e.g., python3.11, python3.12)
-    const fs = require('fs');
-    const pythonDirs = fs.readdirSync(libDir).filter((dir: string) => dir.startsWith('python3.'));
-    
-    if (pythonDirs.length === 0) {
-      this.logError(`No Python version directory found in ${libDir}`);
-      throw new Error('No Python version directory found in virtual environment');
-    }
-
-    // Use the first (and typically only) Python version directory found
-    const pythonVersionDir = pythonDirs[0];
-    const destEnv = join(libDir, pythonVersionDir, '.env');
-    
-    const destDir = dirname(destEnv);
-    if (!existsSync(destDir)) {
-      mkdirSync(destDir, { recursive: true });
+      mkdirSync(libDir, { recursive: true });
     }
     
     copyFileSync(srcEnv, destEnv);
@@ -226,7 +208,7 @@ export class LinuxInstallationStrategy extends InstallationStrategy {
         ]
       };
     } else {
-      // In production, use the installed open-webui executable from venv
+      // In production, use the installed open-webui executable from standalone Python
       return {
         executable: paths.openWebUIExecutable,
         args: ['serve']
@@ -234,73 +216,77 @@ export class LinuxInstallationStrategy extends InstallationStrategy {
     }
   }
 
-  private async checkSystemPython(): Promise<string | null> {
-    try {
-      // Try python3 first
-      const version = execSync('python3 --version', { encoding: 'utf8' }).trim();
-      const match = version.match(/Python (\d+)\.(\d+)\.(\d+)/);
-      
-      if (match) {
-        const major = parseInt(match[1]);
-        const minor = parseInt(match[2]);
-        
-        if (major === 3 && minor >= 11) {
-          this.logInfo(`Found system Python: ${version}`);
-          return version;
-        }
-      }
-    } catch (err) {
-      this.logError(`Failed to check system Python: ${err}`);
+  private getPythonDownloadUrl(): string {
+    const arch = os.arch();
+    if (arch === 'x64') {
+      return `https://github.com/indygreg/python-build-standalone/releases/download/${PYTHON_BUILD_VERSION}/cpython-${PYTHON_VERSION}+${PYTHON_BUILD_VERSION}-x86_64-unknown-linux-gnu-install_only.tar.gz`;
+    } else {
+      throw new Error('Unsupported architecture: ' + arch + '. Only x64 is supported.');
     }
-    
-    return null;
   }
 
-  private async createVirtualEnvironment(): Promise<void> {
+  private async downloadPython(url: string, tarPath: string): Promise<void> {
+    this.logInfo('Downloading Python...');
     return new Promise<void>((resolve, reject) => {
-      const proc = spawn('python3', ['-m', 'venv', this.virtualEnvPath], { 
-        stdio: 'pipe' 
-      });
-      
-      let stderr = '';
-      
-      proc.stderr.on('data', (data) => {
-        stderr += data;
-        this.logError(`[venv] ${data.toString().trim()}`);
-      });
-      
-      proc.on('close', (code) => {
-        if (code === 0) {
-          this.logInfo('Virtual environment created successfully.');
-          resolve();
-        } else {
-          reject(new Error(`Failed to create virtual environment. Exit code: ${code}\nError: ${stderr}`));
-        }
-      });
-      
-      proc.on('error', (err) => {
-        reject(err);
-      });
+      fetch(url)
+        .then(response => {
+          if (response.status !== 200) {
+            this.logError('Failed to download Python: ' + response.status);
+            reject(new Error('Failed to download Python: ' + response.status));
+            return;
+          }
+          const file = createWriteStream(tarPath);
+          response.body.pipe(file);
+          file.on('finish', () => {
+            file.close();
+            this.logInfo('Python download finished.');
+            resolve();
+          });
+        })
+        .catch(err => {
+          this.logError(`Download error: ${err}`);
+          reject(err);
+        });
     });
   }
 
-  private async upgradePip(): Promise<void> {
-    const result = await this.runPipCommand([
-      'install',
-      '--upgrade',
-      'pip'
-    ]);
-
-    if (result.code !== 0) {
-      throw new Error(`Failed to upgrade pip. Exit code: ${result.code}\nError: ${result.stderr}`);
+  private async extractPython(tarPath: string, destDir: string): Promise<void> {
+    this.logInfo('Extracting Python...');
+    try {
+      await extract({
+        file: tarPath,
+        cwd: destDir,
+        strip: 1 // Remove the top-level directory from extraction
+      });
+      
+      // Make Python executable
+      const pythonExe = join(destDir, 'bin', 'python3');
+      if (existsSync(pythonExe)) {
+        chmodSync(pythonExe, 0o755);
+      }
+      
+      // Clean up tar file
+      rmSync(tarPath, { force: true });
+      this.logInfo('Python extraction finished.');
+    } catch (error) {
+      this.logError(`Failed to extract Python: ${error}`);
+      throw error;
     }
-    
-    this.logInfo('pip upgraded successfully.');
+  }
+
+  private async ensurePipInstalled(): Promise<void> {
+    // Python standalone builds come with pip already installed
+    // Just verify it works
+    const result = await this.runPipCommand(['--version']);
+    if (result.code !== 0) {
+      throw new Error(`pip verification failed. Exit code: ${result.code}\nError: ${result.stderr}`);
+    }
+    this.logInfo('pip verified successfully.');
   }
 
   private async runPipCommand(args: string[]): Promise<{ code: number, stdout: string, stderr: string }> {
     const paths = this.getPaths();
-    return this.runCommand(paths.pipExecutable, args);
+    return this.runCommand(paths.pythonExecutable, ['-m', 'pip', ...args]);
   }
 
   private async runCommand(cmd: string, args: string[]): Promise<{ code: number, stdout: string, stderr: string }> {
