@@ -208,7 +208,6 @@ const runStartupFlow = async (): Promise<void> => {
 			type: 'error',
 			message: `Failed to start GAIA UI. Check logs at: ${logPath}`
 		});
-		windowManager.showErrorPage('Failed to start GAIA UI');
 	}
 };
 
@@ -257,7 +256,6 @@ const runInstallationFlow = async (): Promise<void> => {
 			type: 'error',
 			message: `Installation failed. Check logs at: ${logPath}`
 		});
-		windowManager.showErrorPage('Installation failed');
 	}
 };
 
@@ -283,8 +281,14 @@ const pollBackend = () => {
 			const rauxStatus = rauxProcessManager.getStatus();
 			
 			if (rauxStatus === 'crashed') {
+
 				logError(`Backend connection failed - RAUX backend crashed. Error: ${error.message || error}`);
-				windowManager.showErrorPage('GAIA failed to start');
+
+				ipcManager.sendToAll(IPCChannels.INSTALLATION_ERROR, {
+					type: 'error',
+					message: `GAIA failed to start. Check logs at: ${logPath}`
+				});
+				
 			} else {
 				setTimeout(pollBackend, 2000);
 			}
