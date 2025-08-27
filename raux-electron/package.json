@@ -2,7 +2,7 @@
   "name": "gaia-ui",
   "productName": "GAIA UI",
   "version": "0.2.4",
-  "raux-version": "0.6.5+raux.0.2.3",
+  "raux-version": "0.6.5+raux.0.2.4",
   "description": "GAIA's Ryzen AI User Experience (RAUX)",
   "main": ".webpack/main",
   "scripts": {
