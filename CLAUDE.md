@@ -65,7 +65,7 @@ raux-wheel-context.zip
 ### Frontend Development
 ```bash
 npm run dev                    # Start dev server (localhost:5173)
-npm run dev:5050              # Start dev server on port 5050
+npm run dev:8080              # Start dev server on port 8080
 npm run build                 # Build for production
 npm run check                 # Type checking
 npm run lint                  # Lint frontend + backend
@@ -185,8 +185,8 @@ RAUX can be installed:
 RAUX uses a dual versioning scheme that must be updated in multiple files when incrementing versions:
 
 ### Versioning Scheme
-- **Full Version**: `0.6.5+raux.0.2.3` (OpenWebUI base version + RAUX increment)
-- **Electron Version**: `0.2.3` (RAUX version only, without OpenWebUI base)
+- **Full Version**: `0.6.5+raux.0.2.4` (OpenWebUI base version + RAUX increment)
+- **Electron Version**: `0.2.4` (RAUX version only, without OpenWebUI base)
 
 ### Files to Update When Incrementing Version
 1. **Root package.json** (`/package.json`):
